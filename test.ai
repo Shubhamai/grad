@@ -1,0 +1,20 @@
+// by default values are mutable
+
+read()
+
+
+let a = -3.345;
+
+let b = 5;
+
+print(a);
+print(b);
+print(a);
+
+// b = 3;
+print(b);
+
+// let b = a + 2;
+// b = 3
+
+// a += 4;

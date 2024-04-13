@@ -1,4 +1,7 @@
 // einops, llm.c, ggml, micrograd, tinygrad, candle, gpt2-np, 
+// https://github.com/waveworks-ai/fl
+// https://www.reddit.com/r/MachineLearning/comments/1102t34/d_have_their_been_any_attempts_to_create_a/
+// https://arogozhnikov.github.io/2023/12/28/fastest-autograd.html
 
 // fun addPair(a, b) {
 //   return a + b;
@@ -16,7 +19,7 @@ model MyNet (None, 784) {
     
     gelu (None, 1) 0.5 * x * (1 + tanh(sqrt(2 / pi) * (x + 0.044715 * x**3))) -> (None, 1)
 
-    softmax  -> (None, 10)
+    softmax  -> (None, 10) {
         exp(x - max(x, axis=-1, keepdims=True)) / sum(exp(x, axis=-1, keepdims=True))
     } -> (None, 10)
 

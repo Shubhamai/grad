@@ -2,7 +2,11 @@
 name = "ai"
 version = "0.1.0"
 edition = "2021"
+description = "A programming language with built-in autograd"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+ariadne = "0.4.0"
+chumsky = { version = "1.0.0-alpha.7", features = ["label"] }
+clap = { version = "4.5.4", features = ["derive"] }
