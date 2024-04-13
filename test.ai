@@ -1,7 +1,5 @@
 // by default values are mutable
 
-read()
-
 
 let a = -3.345;
 

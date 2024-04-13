@@ -8,5 +8,4 @@ description = "A programming language with built-in autograd"
 
 [dependencies]
 ariadne = "0.4.0"
-chumsky = { version = "1.0.0-alpha.7", features = ["label"] }
 clap = { version = "4.5.4", features = ["derive"] }
