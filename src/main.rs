@@ -1,7 +1,11 @@
+mod expr;
 mod lexer;
-mod runtime;
+mod parser;
+
+use crate::{expr::ValueType, lexer::Token};
 
 use clap::Parser as ClapParser;
+use logos::Logos;
 use std::io::Write;
 
 #[derive(ClapParser, Debug)]
@@ -35,7 +39,7 @@ fn main() {
                 break;
             }
 
-            runtime::run(&input);
+            run(&input);
         }
     } else {
         // read file
@@ -45,8 +49,56 @@ fn main() {
             Err(e) => panic!("Error reading file: {}", e),
         };
 
-        runtime::run(&src);
+        run(&src);
+    }
+}
 
+fn run(src: &str) {
+    let mut lex = lexer::TokenType::lexer(&src);
 
+    let mut tokens: Vec<Token> = Vec::new();
+    loop {
+        let token = lex.next();
+
+        match token {
+            None => break,
+            _ => {
+                tokens.push(Token {
+                    token_type: match token {
+                        Some(_) => match token.clone().unwrap() {
+                            Ok(token) => token,
+                            Err(_) => panic!("Error parsing token"),
+                        },
+                        None => panic!("Error parsing token"),
+                    },
+                    literal: {
+                        match token {
+                            Some(Ok(lexer::TokenType::Number)) => {
+                                Some(ValueType::Number(lex.slice().parse::<f64>().unwrap()))
+                            }
+                            Some(Ok(lexer::TokenType::String)) => {
+                                Some(ValueType::String(lex.slice().to_owned()))
+                            }
+                            Some(Ok(lexer::TokenType::True)) => Some(ValueType::Boolean(true)),
+                            Some(Ok(lexer::TokenType::False)) => Some(ValueType::Boolean(false)),
+                            Some(Ok(lexer::TokenType::NIL)) => Some(ValueType::Nil),
+                            _ => None,
+                        }
+                    },
+                    lexeme: lex.slice().to_string(),
+                    span: lex.span(),
+                });
+            }
+        }
+    }
+
+    println!("{:?}", tokens);
+
+    let mut parser = parser::Parser::new(tokens);
+    let expr = parser.parse();
+
+    match expr {
+        Ok(expr) => println!("{}", expr),
+        Err(e) => println!("{}", e),
     }
 }
