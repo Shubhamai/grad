@@ -6,10 +6,77 @@ pub enum ValueType {
     String(String),
     Boolean(bool),
     Nil,
+    // Lists, Dicts, Tensors, etc.
 }
 
+impl std::ops::Add for ValueType {
+    type Output = Self;
 
-// a struct to represent a AST node
+    fn add(self, other: Self) -> Self {
+        match (self, other) {
+            (ValueType::Number(a), ValueType::Number(b)) => ValueType::Number(a + b),
+            (ValueType::String(a), ValueType::String(b)) => ValueType::String(a + &b),
+            _ => panic!("Invalid operands for addition"),
+        }
+    }
+}
+
+impl std::ops::Sub for ValueType {
+    type Output = Self;
+
+    fn sub(self, other: Self) -> Self {
+        match (self, other) {
+            (ValueType::Number(a), ValueType::Number(b)) => ValueType::Number(a - b),
+            _ => panic!("Invalid operands for subtraction"),
+        }
+    }
+}
+
+impl std::ops::Mul for ValueType {
+    type Output = Self;
+
+    fn mul(self, other: Self) -> Self {
+        match (self, other) {
+            (ValueType::Number(a), ValueType::Number(b)) => ValueType::Number(a * b),
+            _ => panic!("Invalid operands for multiplication"),
+        }
+    }
+}
+
+impl std::ops::Div for ValueType {
+    type Output = Self;
+
+    fn div(self, other: Self) -> Self {
+        match (self, other) {
+            (ValueType::Number(a), ValueType::Number(b)) => ValueType::Number(a / b),
+            _ => panic!("Invalid operands for division"),
+        }
+    }
+}
+
+impl std::ops::Not for ValueType {
+    type Output = Self;
+
+    fn not(self) -> Self {
+        match self {
+            ValueType::Boolean(b) => ValueType::Boolean(!b),
+            _ => panic!("Invalid operand for not"),
+        }
+    }
+}
+
+impl std::ops::Neg for ValueType {
+    type Output = Self;
+
+    fn neg(self) -> Self {
+        match self {
+            ValueType::Number(n) => ValueType::Number(-n),
+            _ => panic!("Invalid operand for negation"),
+        }
+    }
+}
+
+// a struct to represent the AST
 pub enum Expr {
     Binary {
         left: Box<Expr>,
@@ -28,12 +95,15 @@ pub enum Expr {
     },
 }
 
-
 // implement display for Expr
 impl std::fmt::Display for Expr {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            Expr::Binary { left, operator, right } => {
+            Expr::Binary {
+                left,
+                operator,
+                right,
+            } => {
                 write!(f, "({:?} {} {})", operator, left, right)
             }
             Expr::Grouping { expression } => {
@@ -75,5 +145,4 @@ mod tests {
             "(STAR (MINUS Number(123.0)) (group Number(45.67)))"
         );
     }
-
 }

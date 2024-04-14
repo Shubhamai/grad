@@ -1,4 +1,5 @@
 mod expr;
+mod interpreter;
 mod lexer;
 mod parser;
 
@@ -92,13 +93,14 @@ fn run(src: &str) {
         }
     }
 
-    println!("{:?}", tokens);
-
     let mut parser = parser::Parser::new(tokens);
-    let expr = parser.parse();
+    let expr = match parser.parse() {
+        Ok(expr) => expr,
+        Err(e) => panic!("Error parsing expression: {}", e),
+    };
 
-    match expr {
-        Ok(expr) => println!("{}", expr),
-        Err(e) => println!("{}", e),
-    }
+    let interpreter = interpreter::Interpreter::new();
+    let result = interpreter.visit_expr(&expr);
+
+    println!("{:?}", result);
 }
