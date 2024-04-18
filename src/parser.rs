@@ -1,5 +1,5 @@
 use crate::{
-    expr::{Expr, ValueType},
+    expr::{Expr, Statement, ValueType},
     lexer::{Token, TokenType},
 };
 
@@ -13,12 +13,80 @@ impl Parser {
         Self { tokens, current: 0 }
     }
 
-    pub fn parse(&mut self) -> Result<Expr, String> {
-        Ok(self.expression())
+    pub fn parse(&mut self) -> Result<Vec<Statement>, String> {
+        // Ok(self.expression())
+
+        let mut statements = Vec::new();
+        while !self.is_at_end() {
+            // statements.push(self.statement());
+            statements.push(self.declaration());
+        }
+
+        return Ok(statements);
     }
 
     fn expression(&mut self) -> Expr {
         self.equality()
+    }
+
+    fn declaration(&mut self) -> Statement {
+        if self.match_token(&[TokenType::LET]) {
+            return self.let_declaration();
+        }
+
+        self.statement()
+
+        // TODO : No synchronize()
+    }
+
+    fn statement(&mut self) -> Statement {
+        // parse print statement in  the form of print LEFT_PAREN expression RIGHT_PAREN SEMICOLON
+
+        if self.match_token(&[TokenType::PRINT]) {
+            return self.print_statement();
+        }
+
+        return self.expression_statement();
+    }
+
+    fn print_statement(&mut self) -> Statement {
+        // let value = self.expression();
+        // let _ = self.consume(TokenType::SEMICOLON, "Expect ';' after value.");
+
+        let _ = self.consume(TokenType::LEFT_PAREN, "Expect '(' after print.");
+        let value = self.expression();
+        let _ = self.consume(TokenType::RIGHT_PAREN, "Expect ')' after expression.");
+        let _ = self.consume(TokenType::SEMICOLON, "Expect ';' after value.");
+
+        Statement::Print { expression: value }
+    }
+
+    fn let_declaration(&mut self) -> Statement {
+        let name = self.consume(TokenType::Identifier, "Expect variable name.");
+
+        let _ = self.consume(TokenType::EQUAL, "Expect '=' after variable name.");
+
+        let initializer = self.expression();
+
+        let _ = self.consume(
+            TokenType::SEMICOLON,
+            "Expect ';' after variable declaration.",
+        );
+
+        Statement::Let {
+            name: match name {
+                Ok(name) => name.lexeme,
+                _ => panic!("Expect variable name."),
+            },
+            initializer,
+        }
+    }
+
+    fn expression_statement(&mut self) -> Statement {
+        let expr = self.expression();
+        let _ = self.consume(TokenType::SEMICOLON, "Expect ';' after expression.");
+
+        Statement::Expression { expression: expr }
     }
 
     fn equality(&mut self) -> Expr {
@@ -157,22 +225,31 @@ impl Parser {
             };
         }
 
+        if self.match_token(&[TokenType::LET]) {
+            println!("Let statement");
+            println!("{:?}", self.previous());
+            return Expr::Let {
+                token: self.previous(),
+            };
+        }
+
         // COMMENT token
         if self.match_token(&[TokenType::COMMENT]) {
             return self.primary();
         }
 
-        // println!("{:?}", self.peek());
-
-        panic!("Error at {}: Expect expression.", self.peek().span.start);
+        panic!("Expect expression.");
+        // panic!("Error at {}: Expect expression.", self.peek().span.start);
     }
 
-    fn consume(&mut self, token_type: TokenType, message: &str) -> Result<(), String> {
+    fn consume(&mut self, token_type: TokenType, message: &str) -> Result<Token, String> {
         if !self.check(&token_type) {
-            Err(format!("Error at {}: {}", self.peek().span.start, message))
+            // Err(format!("Error at {}: {}", self.peek().span.start, message))
+            panic!("{}", message);
         } else {
             self.advance();
-            Ok(())
+            let token = self.previous();
+            Ok(token)
         }
     }
 

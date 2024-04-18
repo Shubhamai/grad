@@ -6,6 +6,7 @@ mod parser;
 use crate::{expr::ValueType, lexer::Token};
 
 use clap::Parser as ClapParser;
+use expr::Statement;
 use logos::Logos;
 use std::io::Write;
 
@@ -94,13 +95,35 @@ fn run(src: &str) {
     }
 
     let mut parser = parser::Parser::new(tokens);
-    let expr = match parser.parse() {
+    let statements = match parser.parse() {
         Ok(expr) => expr,
         Err(e) => panic!("Error parsing expression: {}", e),
     };
 
+    // let mut environment = environment::Environment::new();
     let interpreter = interpreter::Interpreter::new();
-    let result = interpreter.visit_expr(&expr);
 
-    println!("{:?}", result);
+    for statement in statements {
+        match statement {
+            Statement::Expression { expression } => {
+                let result = interpreter.visit_expr(&expression);
+                // println!("{:?}", result);
+            }
+            Statement::Print { expression } => {
+                let result = interpreter.visit_expr(&expression);
+                println!("{:?}", result);
+            } // _ => panic!("Invalid statement"),
+
+            Statement::Let { name, initializer } => {
+                let result = interpreter.visit_expr(&initializer);
+
+                // environment.define(name.clone(), result);
+
+                // println!("{:?} = {:?}", name, result);
+            }
+        }
+
+        // let result = interpreter.visit_expr(&statement);
+        // println!("{:?}", result);
+    }
 }

@@ -80,8 +80,11 @@ pub enum TokenType {
     SLASH_EQUAL, // /=
 
     // Literals.
-    #[regex(r#"[a-zA-Z_][a-zA-Z0-9_]*"#, |lex| lex.slice().to_owned())]
-    Identifier(String),
+    // #[regex(r#"[a-zA-Z_][a-zA-Z0-9_]*"#, |lex| lex.slice().to_owned())]
+    // Identifier(String),
+
+    #[regex(r#"[a-zA-Z_][a-zA-Z0-9_]*"#)]
+    Identifier, //(String),
 
     #[regex(r"-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?")] // , |lex| lex.slice().parse::<f64>().unwrap())]
     Number, //(f64),
@@ -173,7 +176,7 @@ mod tests {
         assert_eq!(lexer.next(), Some(Ok(TokenType::LET)));
         assert_eq!(
             lexer.next(),
-            Some(Ok(TokenType::Identifier("x".to_string())))
+            Some(Ok(TokenType::Identifier))
         );
         assert_eq!(lexer.next(), Some(Ok(TokenType::EQUAL)));
         assert_eq!(lexer.next(), Some(Ok(TokenType::Number)));
@@ -186,7 +189,7 @@ mod tests {
         assert_eq!(lexer.next(), Some(Ok(TokenType::LET)));
         assert_eq!(
             lexer.next(),
-            Some(Ok(TokenType::Identifier("a".to_string())))
+            Some(Ok(TokenType::Identifier))
         );
         assert_eq!(lexer.next(), Some(Ok(TokenType::EQUAL)));
         assert_eq!(
@@ -202,7 +205,7 @@ mod tests {
         assert_eq!(lexer.next(), Some(Ok(TokenType::LET)));
         assert_eq!(
             lexer.next(),
-            Some(Ok(TokenType::Identifier("a".to_string())))
+            Some(Ok(TokenType::Identifier))
         );
         assert_eq!(lexer.next(), Some(Ok(TokenType::EQUAL)));
         assert_eq!(lexer.next(), Some(Ok(TokenType::Number)));
@@ -216,14 +219,14 @@ mod tests {
         assert_eq!(lexer.next(), Some(Ok(TokenType::LET)));
         assert_eq!(
             lexer.next(),
-            Some(Ok(TokenType::Identifier("a".to_string())))
+            Some(Ok(TokenType::Identifier))
         );
         assert_eq!(lexer.next(), Some(Ok(TokenType::EQUAL)));
         assert_eq!(lexer.next(), Some(Ok(TokenType::Number)));
         assert_eq!(lexer.next(), Some(Ok(TokenType::SEMICOLON)));
         assert_eq!(
             lexer.next(),
-            Some(Ok(TokenType::Identifier("a".to_string())))
+            Some(Ok(TokenType::Identifier))
         );
         assert_eq!(lexer.next(), Some(Ok(TokenType::PLUS_EQUAL)));
         assert_eq!(lexer.next(), Some(Ok(TokenType::Number)));
@@ -232,7 +235,7 @@ mod tests {
         assert_eq!(lexer.next(), Some(Ok(TokenType::LEFT_PAREN)));
         assert_eq!(
             lexer.next(),
-            Some(Ok(TokenType::Identifier("a".to_string())))
+            Some(Ok(TokenType::Identifier))
         );
         assert_eq!(lexer.next(), Some(Ok(TokenType::EQUAL_EQUAL)));
         assert_eq!(lexer.next(), Some(Ok(TokenType::Number)));
@@ -245,7 +248,7 @@ mod tests {
         assert_eq!(lexer.next(), Some(Ok(TokenType::LET)));
         assert_eq!(
             lexer.next(),
-            Some(Ok(TokenType::Identifier("true_false_a".to_string())))
+            Some(Ok(TokenType::Identifier))
         );
         assert_eq!(lexer.next(), Some(Ok(TokenType::EQUAL)));
         assert_eq!(lexer.next(), Some(Ok(TokenType::Number)));
@@ -253,7 +256,7 @@ mod tests {
         assert_eq!(lexer.next(), Some(Ok(TokenType::LET)));
         assert_eq!(
             lexer.next(),
-            Some(Ok(TokenType::Identifier("a".to_string())))
+            Some(Ok(TokenType::Identifier))
         );
         assert_eq!(lexer.next(), Some(Ok(TokenType::EQUAL)));
         assert_eq!(lexer.next(), Some(Ok(TokenType::True)));
@@ -261,7 +264,7 @@ mod tests {
         assert_eq!(lexer.next(), Some(Ok(TokenType::LET)));
         assert_eq!(
             lexer.next(),
-            Some(Ok(TokenType::Identifier("b".to_string())))
+            Some(Ok(TokenType::Identifier))
         );
         assert_eq!(lexer.next(), Some(Ok(TokenType::EQUAL)));
         assert_eq!(lexer.next(), Some(Ok(TokenType::False)));

@@ -1,16 +1,24 @@
-use crate::{expr::{Expr, ValueType}, lexer::TokenType};
+use crate::{
+    // environment::Environment,
+    expr::{Expr, ValueType},
+    lexer::TokenType,
+};
 
-pub struct Interpreter;
+pub struct Interpreter {}
 
 impl Interpreter {
     pub fn new() -> Self {
-        Interpreter
+        Interpreter {}
     }
 
     // TODO: shell etiquette - use exit code 70 for error
     pub fn visit_expr(&self, expr: &Expr) -> ValueType {
         match expr {
-            Expr::Binary { left, operator, right } => {
+            Expr::Binary {
+                left,
+                operator,
+                right,
+            } => {
                 let left = self.visit_expr(left);
                 let right = self.visit_expr(right);
 
@@ -41,6 +49,11 @@ impl Interpreter {
                     _ => panic!("Invalid operator"),
                 }
             }
+            Expr::Let { token } => {
+                todo!("Implement let statement")
+            }
         }
     }
 }
+
+// TODO : Make it work for - 1 == (2 == 2) - implement int

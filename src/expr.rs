@@ -1,6 +1,6 @@
-use crate::lexer::TokenType;
+use crate::lexer::{Token, TokenType};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, PartialOrd)]
 pub enum ValueType {
     Number(f64), // TODO: Ideally, it should be seperate types for int and float (maybe?)
     String(String),
@@ -77,6 +77,7 @@ impl std::ops::Neg for ValueType {
 }
 
 // a struct to represent the AST
+#[derive(Debug)]
 pub enum Expr {
     Binary {
         left: Box<Expr>,
@@ -92,6 +93,9 @@ pub enum Expr {
     Unary {
         operator: TokenType,
         right: Box<Expr>,
+    },
+    Let {
+        token: Token,
     },
 }
 
@@ -115,8 +119,18 @@ impl std::fmt::Display for Expr {
             Expr::Unary { operator, right } => {
                 write!(f, "({:?} {})", operator, right)
             }
+            Expr::Let { token: name } => {
+                write!(f, "{:?}", name)
+            }
         }
     }
+}
+
+#[derive(Debug)]
+pub enum Statement {
+    Expression { expression: Expr },
+    Print { expression: Expr },
+    Let { name: String, initializer: Expr },
 }
 
 #[cfg(test)]
