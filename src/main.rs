@@ -1,12 +1,10 @@
-mod expr;
-mod interpreter;
-mod lexer;
-mod parser;
-
-use crate::{expr::ValueType, lexer::Token};
+mod chunk;
+mod debug;
+mod value;
+mod vm;
 
 use clap::Parser as ClapParser;
-use expr::Statement;
+use debug::Disassemble;
 use logos::Logos;
 use std::io::Write;
 
@@ -56,74 +54,26 @@ fn main() {
 }
 
 fn run(src: &str) {
-    let mut lex = lexer::TokenType::lexer(&src);
+    let chunk = chunk::Chunk::new();
+    let mut vm = vm::VM::init(chunk);
 
-    let mut tokens: Vec<Token> = Vec::new();
-    loop {
-        let token = lex.next();
+    vm.chunk.write(usize::from(chunk::OpCode::OpConstant));
+    let constant = vm.chunk.add_constant(1.2);
+    vm.chunk.write(constant);
 
-        match token {
-            None => break,
-            _ => {
-                tokens.push(Token {
-                    token_type: match token {
-                        Some(_) => match token.clone().unwrap() {
-                            Ok(token) => token,
-                            Err(_) => panic!("Error parsing token"),
-                        },
-                        None => panic!("Error parsing token"),
-                    },
-                    literal: {
-                        match token {
-                            Some(Ok(lexer::TokenType::Number)) => {
-                                Some(ValueType::Number(lex.slice().parse::<f64>().unwrap()))
-                            }
-                            Some(Ok(lexer::TokenType::String)) => {
-                                Some(ValueType::String(lex.slice().to_owned()))
-                            }
-                            Some(Ok(lexer::TokenType::True)) => Some(ValueType::Boolean(true)),
-                            Some(Ok(lexer::TokenType::False)) => Some(ValueType::Boolean(false)),
-                            Some(Ok(lexer::TokenType::NIL)) => Some(ValueType::Nil),
-                            _ => None,
-                        }
-                    },
-                    lexeme: lex.slice().to_string(),
-                    span: lex.span(),
-                });
-            }
-        }
-    }
+    vm.chunk.write(usize::from(chunk::OpCode::OpConstant));
+    let constant = vm.chunk.add_constant(4.8);
+    vm.chunk.write(constant);
 
-    let mut parser = parser::Parser::new(tokens);
-    let statements = match parser.parse() {
-        Ok(expr) => expr,
-        Err(e) => panic!("Error parsing expression: {}", e),
-    };
+    vm.chunk.write(usize::from(chunk::OpCode::OpAdd));
 
-    // let mut environment = environment::Environment::new();
-    let interpreter = interpreter::Interpreter::new();
 
-    for statement in statements {
-        match statement {
-            Statement::Expression { expression } => {
-                let result = interpreter.visit_expr(&expression);
-                // println!("{:?}", result);
-            }
-            Statement::Print { expression } => {
-                let result = interpreter.visit_expr(&expression);
-                println!("{:?}", result);
-            } // _ => panic!("Invalid statement"),
+    vm.chunk.write(usize::from(chunk::OpCode::OpReturn));
 
-            Statement::Let { name, initializer } => {
-                let result = interpreter.visit_expr(&initializer);
+    vm.chunk.disassemble("test chunk");
 
-                // environment.define(name.clone(), result);
+    vm.interpret();
 
-                // println!("{:?} = {:?}", name, result);
-            }
-        }
-
-        // let result = interpreter.visit_expr(&statement);
-        // println!("{:?}", result);
-    }
+    // vm.free();
+    // chunk.free();
 }
