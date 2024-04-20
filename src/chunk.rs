@@ -1,14 +1,21 @@
 use std::alloc::realloc;
 
-use crate::value::{Value, ValueArray};
+use crate::value::{ValueArray, ValueType};
 
 pub enum OpCode {
     OpConstant,
+    OpNil,
+    OpTrue,
+    OpFalse,
     OpNegate,
     OpAdd,
     OpSubtract,
     OpMultiply,
     OpDivide,
+    OpNot,
+    OpEqual,
+    OpGreater,
+    OpLess,
     OpReturn,
 }
 
@@ -20,9 +27,15 @@ impl From<OpCode> for usize {
             OpCode::OpNegate => 2,
             OpCode::OpAdd => 3,
             OpCode::OpSubtract => 4,
-            OpCode::OpMultiply => 5,    
+            OpCode::OpMultiply => 5,
             OpCode::OpDivide => 6,
-
+            OpCode::OpNil => 7,
+            OpCode::OpTrue => 8,
+            OpCode::OpFalse => 9,
+            OpCode::OpNot => 10,
+            OpCode::OpEqual => 11,
+            OpCode::OpGreater => 12,
+            OpCode::OpLess => 13,
         }
     }
 }
@@ -37,7 +50,13 @@ impl From<usize> for OpCode {
             4 => OpCode::OpSubtract,
             5 => OpCode::OpMultiply,
             6 => OpCode::OpDivide,
-
+            7 => OpCode::OpNil,
+            8 => OpCode::OpTrue,
+            9 => OpCode::OpFalse,
+            10 => OpCode::OpNot,
+            11 => OpCode::OpEqual,
+            12 => OpCode::OpGreater,
+            13 => OpCode::OpLess,
             _ => panic!("Unknown opcode: {}", byte),
         }
     }
@@ -53,15 +72,25 @@ impl std::fmt::Display for OpCode {
             OpCode::OpSubtract => write!(f, "OP_SUBTRACT"),
             OpCode::OpMultiply => write!(f, "OP_MULTIPLY"),
             OpCode::OpDivide => write!(f, "OP_DIVIDE"),
-            
+            OpCode::OpNil => write!(f, "OP_NIL"),
+            OpCode::OpTrue => write!(f, "OP_TRUE"),
+            OpCode::OpFalse => write!(f, "OP_FALSE"),
+            OpCode::OpNot => write!(f, "OP_NOT"),
+            OpCode::OpEqual => write!(f, "OP_EQUAL"),
+            OpCode::OpGreater => write!(f, "OP_GREATER"),
+            OpCode::OpLess => write!(f, "OP_LESS"),
         }
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct Chunk {
-    pub count: usize,
-    capacity: usize,
+    // pub count: usize,
+    // capacity: usize,
+
+    // TODO: I am using 4/8 bytes for the instruction, but I should be using a byte
     pub code: Vec<usize>,
+    pub lines: Vec<usize>,
 
     pub constants: ValueArray,
 }
@@ -69,33 +98,39 @@ pub struct Chunk {
 impl Chunk {
     pub fn new() -> Self {
         Self {
-            count: 0,
-            capacity: 0,
+            // count: 0,
+            // capacity: 0,
             code: Vec::new(),
+            lines: Vec::new(),
             constants: ValueArray::new(),
         }
     }
 
-    pub fn write(&mut self, byte: usize) {
-        if self.capacity < self.count + 1 {
-            self.capacity = std::cmp::max(8, self.capacity * 2); // grow capacity by 2x
-            self.code.resize(self.capacity, 0); // resize the code vector to the new capacity
-        }
+    pub fn write(&mut self, byte: usize, line: usize) {
+        // if self.capacity < self.count + 1 {
+        //     self.capacity = std::cmp::max(8, self.capacity * 2); // grow capacity by 2x
+        //     self.code.resize(self.capacity, 0); // resize the code vector to the new capacity
+        //     self.lines.resize(self.capacity, 0); // resize the lines vector to the new capacity
+        // }
 
-        self.code[self.count] = byte;
-        self.count += 1;
+        // self.code[self.count] = byte;
+        // self.lines[self.count] = line;
+        // self.count += 1;
+
+        self.code.push(byte);
+        self.lines.push(line);
     }
 
-    pub fn add_constant(&mut self, value: Value) -> usize {
+    pub fn add_constant(&mut self, value: ValueType) -> usize {
         self.constants.write(value);
-        self.constants.count - 1 // return the index of the constant
+        self.constants.values.len() - 1 // return the index of the constant
     }
 
     pub fn free(&mut self) {
         self.code.clear();
 
-        self.capacity = 0;
-        self.count = 0;
+        // self.capacity = 0;
+        // self.count = 0;
 
         self.constants.free();
     }

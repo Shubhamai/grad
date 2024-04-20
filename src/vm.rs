@@ -1,7 +1,8 @@
 use crate::{
     chunk::{self, Chunk, OpCode},
+    compiler::Compiler,
     debug::Disassemble,
-    value::Value,
+    value::{ValueType},
 };
 
 const STACK_MAX: usize = 256;
@@ -13,7 +14,8 @@ pub(crate) struct VM {
     ip: usize,
 
     // TODO - implement JIT instead of stack perhaps ?
-    stack: [Value; STACK_MAX],
+    // NOTE - using a fixed size array for the stack instead of a Vec
+    stack: [ValueType; STACK_MAX],
     stack_top: usize,
 }
 
@@ -24,13 +26,14 @@ pub enum InterpretResult {
 }
 
 impl VM {
-    pub(crate) fn init(chunk: Chunk) -> VM {
-        // let chunk = Chunk::new();
+    // pub(crate) fn init(chunk: Chunk) -> VM {
+    pub(crate) fn init() -> VM {
+        let chunk = Chunk::new();
 
         VM {
             chunk,
             ip: 0,
-            stack: [0.0; STACK_MAX],
+            stack: core::array::from_fn(|i| ValueType::Nil),
             stack_top: 0,
         }
     }
@@ -40,8 +43,26 @@ impl VM {
         todo!()
     }
 
-    pub(crate) fn interpret(&mut self) -> InterpretResult {
-        return self.run();
+    pub(crate) fn interpret(&mut self, source: &str) -> InterpretResult {
+        
+        let mut compiler = Compiler::new(String::from(source));
+
+        let compiled_output = compiler.compile();
+        let chunk = match compiled_output {
+            Ok(chunk) => chunk,
+            Err(e) => {
+                self.free();
+                return InterpretResult::INTERPRET_COMPILE_ERROR;
+            }
+        };
+
+        self.chunk = chunk;
+        self.ip = 0;
+
+        let result = self.run();
+
+        self.chunk.free();
+        result
     }
 
     fn run(&mut self) -> InterpretResult {
@@ -88,6 +109,35 @@ impl VM {
                     let constant = self.read_constant(index);
                     self.push(constant);
                 }
+                chunk::OpCode::OpNil => {
+                    self.push(ValueType::Nil);
+                }
+                chunk::OpCode::OpTrue => {
+                    self.push(ValueType::Boolean(true));
+                }
+                chunk::OpCode::OpFalse => {
+                    self.push(ValueType::Boolean(false));
+                }
+                chunk::OpCode::OpNot => {
+                    let value = self.pop();
+                    self.push(!value);
+                }
+                chunk::OpCode::OpEqual => {
+                    let b = self.pop();
+                    let a = self.pop();
+                    self.push(ValueType::Boolean(a == b));
+                }
+                chunk::OpCode::OpGreater => {
+                    let b = self.pop();
+                    let a = self.pop();
+                    self.push(ValueType::Boolean(a > b));
+                }
+                chunk::OpCode::OpLess => {
+                    let b = self.pop();
+                    let a = self.pop();
+                    self.push(ValueType::Boolean(a < b));
+                }
+
             }
         }
     }
@@ -99,17 +149,21 @@ impl VM {
         return byte;
     }
 
-    fn read_constant(&mut self, index: usize) -> f32 {
+    fn read_constant(&mut self, index: usize) -> ValueType {
         self.chunk.constants.values[index]
     }
 
-    fn push(&mut self, value: Value) {
+    fn push(&mut self, value: ValueType) {
         self.stack[self.stack_top] = value;
         self.stack_top += 1;
     }
 
-    fn pop(&mut self) -> Value {
+    fn pop(&mut self) -> ValueType {
         self.stack_top -= 1;
         self.stack[self.stack_top]
+    }
+
+    fn peek(&self, distance: usize) -> ValueType {
+        self.stack[self.stack_top - 1 - distance]
     }
 }

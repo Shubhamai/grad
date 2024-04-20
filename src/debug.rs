@@ -12,7 +12,7 @@ impl Disassemble for chunk::Chunk {
         println!("== {} ==", name);
 
         let mut offset = 0;
-        while offset < self.count {
+        while offset < self.code.len() {
             offset = self.disassemble_instruction(offset);
         }
     }
@@ -49,8 +49,39 @@ impl Disassemble for chunk::Chunk {
             }
             chunk::OpCode::OpConstant => {
                 let constant = self.code[offset + 1];
-                println!("{} {:04} | {}", instruction, constant, self.constants.values[constant as usize]);
+                println!(
+                    "{} {:04} | {}",
+                    instruction, constant, self.constants.values[constant as usize]
+                );
                 return offset + 2;
+            }
+            chunk::OpCode::OpNil => {
+                println!("{}", instruction);
+                return offset + 1;
+            }
+            chunk::OpCode::OpTrue => {
+                println!("{}", instruction);
+                return offset + 1;
+            }
+            chunk::OpCode::OpFalse => {
+                println!("{}", instruction);
+                return offset + 1;
+            }
+            chunk::OpCode::OpNot => {
+                println!("{}", instruction);
+                return offset + 1;
+            }
+            chunk::OpCode::OpEqual => {
+                println!("{}", instruction);
+                return offset + 1;
+            }
+            chunk::OpCode::OpGreater => {
+                println!("{}", instruction);
+                return offset + 1;
+            }
+            chunk::OpCode::OpLess => {
+                println!("{}", instruction);
+                return offset + 1;
             }
         }
     }

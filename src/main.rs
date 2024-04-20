@@ -1,11 +1,11 @@
 mod chunk;
+mod compiler;
 mod debug;
+mod scanner;
 mod value;
 mod vm;
 
 use clap::Parser as ClapParser;
-use debug::Disassemble;
-use logos::Logos;
 use std::io::Write;
 
 #[derive(ClapParser, Debug)]
@@ -22,25 +22,8 @@ fn main() {
     // Check if args.script is provided
     if args.script.is_empty() {
         // run as a repl
-        loop {
-            // print prompt
-            print!("> ");
-            let _ = std::io::stdout().flush();
 
-            // read input
-            let mut input = String::new();
-            input = match std::io::stdin().read_line(&mut input) {
-                Ok(_) => input,
-                Err(e) => panic!("Error reading input: {}", e),
-            };
-
-            // exit if input is "exit"
-            if input.trim() == "exit" || input.trim() == "" {
-                break;
-            }
-
-            run(&input);
-        }
+        run_repl();
     } else {
         // read file
 
@@ -49,31 +32,55 @@ fn main() {
             Err(e) => panic!("Error reading file: {}", e),
         };
 
-        run(&src);
+        run_source(&src);
     }
 }
 
-fn run(src: &str) {
-    let chunk = chunk::Chunk::new();
-    let mut vm = vm::VM::init(chunk);
+fn run_repl() {
+    // let chunk = chunk::Chunk::new();
+    // let mut vm = vm::VM::init(chunk);
+    let mut vm = vm::VM::init();
 
-    vm.chunk.write(usize::from(chunk::OpCode::OpConstant));
-    let constant = vm.chunk.add_constant(1.2);
-    vm.chunk.write(constant);
+    loop {
+        // print prompt
+        print!("> ");
+        let _ = std::io::stdout().flush();
 
-    vm.chunk.write(usize::from(chunk::OpCode::OpConstant));
-    let constant = vm.chunk.add_constant(4.8);
-    vm.chunk.write(constant);
+        // read input
+        let mut input = String::new();
+        input = match std::io::stdin().read_line(&mut input) {
+            Ok(_) => input,
+            Err(e) => panic!("Error reading input: {}", e),
+        };
 
-    vm.chunk.write(usize::from(chunk::OpCode::OpAdd));
+        // exit if input is "exit"
+        if input.trim() == "exit" || input.trim() == "" {
+            break;
+        }
 
+        // run source
+        vm.interpret(&input);
+    }
+}
 
-    vm.chunk.write(usize::from(chunk::OpCode::OpReturn));
+fn run_source(src: &str) {
+    // let chunk = chunk::Chunk::new();
+    // let mut vm = vm::VM::init(chunk);
+    let mut vm = vm::VM::init();
 
-    vm.chunk.disassemble("test chunk");
+    let result = vm.interpret(src);
 
-    vm.interpret();
+    // match result {
+    //     vm::InterpretResult::INTERPRET_COMPILE_ERROR => {
+    //         println!("Compile error");
+    //     }
+    //     vm::InterpretResult::INTERPRET_RUNTIME_ERROR => {
+    //         println!("Runtime error");
+    //     }
+    //     vm::InterpretResult::INTERPRET_OK => {
+    //         println!("Interpret ok");
+    //     }
+    // }
 
-    // vm.free();
-    // chunk.free();
+    vm.free();
 }
