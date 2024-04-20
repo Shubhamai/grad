@@ -17,6 +17,7 @@ pub enum OpCode {
     OpGreater,
     OpLess,
     OpReturn,
+    OpPrint
 }
 
 impl From<OpCode> for usize {
@@ -36,6 +37,7 @@ impl From<OpCode> for usize {
             OpCode::OpEqual => 11,
             OpCode::OpGreater => 12,
             OpCode::OpLess => 13,
+            OpCode::OpPrint => 14,
         }
     }
 }
@@ -57,6 +59,7 @@ impl From<usize> for OpCode {
             11 => OpCode::OpEqual,
             12 => OpCode::OpGreater,
             13 => OpCode::OpLess,
+            14 => OpCode::OpPrint,
             _ => panic!("Unknown opcode: {}", byte),
         }
     }
@@ -79,6 +82,7 @@ impl std::fmt::Display for OpCode {
             OpCode::OpEqual => write!(f, "OP_EQUAL"),
             OpCode::OpGreater => write!(f, "OP_GREATER"),
             OpCode::OpLess => write!(f, "OP_LESS"),
+            OpCode::OpPrint => write!(f, "OP_PRINT"),
         }
     }
 }

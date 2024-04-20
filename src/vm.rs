@@ -2,7 +2,8 @@ use crate::{
     chunk::{self, Chunk, OpCode},
     compiler::Compiler,
     debug::Disassemble,
-    value::{ValueType},
+    interner::Interner,
+    value::ValueType,
 };
 
 const STACK_MAX: usize = 256;
@@ -17,6 +18,8 @@ pub(crate) struct VM {
     // NOTE - using a fixed size array for the stack instead of a Vec
     stack: [ValueType; STACK_MAX],
     stack_top: usize,
+
+    interner: Interner,
 }
 
 pub enum InterpretResult {
@@ -35,6 +38,7 @@ impl VM {
             ip: 0,
             stack: core::array::from_fn(|i| ValueType::Nil),
             stack_top: 0,
+            interner: Interner::default(),
         }
     }
 
@@ -44,8 +48,7 @@ impl VM {
     }
 
     pub(crate) fn interpret(&mut self, source: &str) -> InterpretResult {
-        
-        let mut compiler = Compiler::new(String::from(source));
+        let mut compiler = Compiler::new(String::from(source), &mut self.interner);
 
         let compiled_output = compiler.compile();
         let chunk = match compiled_output {
@@ -81,9 +84,13 @@ impl VM {
                     return InterpretResult::INTERPRET_OK;
                 }
                 chunk::OpCode::OpAdd => {
-                    let b = self.pop();
-                    let a = self.pop();
-                    self.push(a + b);
+                    if let ValueType::String(_) = self.peek(0) {
+                        self.concatenate();
+                    } else {
+                        let b = self.pop();
+                        let a = self.pop();
+                        self.push(a + b);
+                    }
                 }
                 chunk::OpCode::OpSubtract => {
                     let b = self.pop();
@@ -137,7 +144,9 @@ impl VM {
                     let a = self.pop();
                     self.push(ValueType::Boolean(a < b));
                 }
-
+                chunk::OpCode::OpPrint => {
+                    println!("{}", self.pop());
+                }
             }
         }
     }
@@ -165,5 +174,22 @@ impl VM {
 
     fn peek(&self, distance: usize) -> ValueType {
         self.stack[self.stack_top - 1 - distance]
+    }
+
+    fn concatenate(&mut self) {
+        let b = self.pop();
+        let a = self.pop();
+
+        if let ValueType::String(a) = a {
+            if let ValueType::String(b) = b {
+                let b_str = self.interner.lookup(b);
+                let a_str = self.interner.lookup(a);
+                let res = a_str.to_owned() + b_str;
+                // debug
+                println!("Concatenated: {}", res);
+                let res_idx = self.interner.intern_string(res);
+                self.push(ValueType::String(res_idx));
+            }
+        }
     }
 }

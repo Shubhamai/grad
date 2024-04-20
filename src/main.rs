@@ -4,6 +4,7 @@ mod debug;
 mod scanner;
 mod value;
 mod vm;
+mod interner;
 
 use clap::Parser as ClapParser;
 use std::io::Write;

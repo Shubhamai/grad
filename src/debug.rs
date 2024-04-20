@@ -83,6 +83,10 @@ impl Disassemble for chunk::Chunk {
                 println!("{}", instruction);
                 return offset + 1;
             }
+            chunk::OpCode::OpPrint => {
+                println!("{}", instruction);
+                return offset + 1;
+            }
         }
     }
 }

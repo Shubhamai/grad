@@ -3,6 +3,7 @@ use logos::{Lexer, Logos};
 use crate::{
     chunk::{Chunk, OpCode},
     debug::Disassemble,
+    interner::Interner,
     scanner::{self, LexingError, TokenType},
     value::ValueType,
 };
@@ -36,9 +37,11 @@ enum Precedence {
     PREC_PRIMARY,
 }
 
+pub type ParseFn = fn(&mut Compiler) -> ();
+
 struct ParseRule {
-    prefix: Option<fn(&mut Compiler)>,
-    infix: Option<fn(&mut Compiler)>,
+    prefix: Option<ParseFn>,
+    infix: Option<ParseFn>,
     precedence: Precedence,
 }
 
@@ -176,7 +179,7 @@ impl ParseRule {
                 precedence: Precedence::PREC_NONE,
             },
             TokenType::String => ParseRule {
-                prefix: None,
+                prefix: Some(Compiler::string),
                 infix: None,
                 precedence: Precedence::PREC_NONE,
             },
@@ -266,10 +269,11 @@ pub(crate) struct Compiler {
     current_token: usize,
 
     parser: Parser,
+    // interner: &'src mut Interner,
 }
 
 impl Compiler {
-    pub fn new(source: String) -> Self {
+    pub fn new(source: String, interner: &mut Interner) -> Compiler {
         let mut tokens = TokenType::lexer(&source);
         // remove the lifetime from the tokens without use_ref
         // let tokens = TokenType::lexer(&source).spanned().collect();
@@ -291,7 +295,7 @@ impl Compiler {
                 TokenType::Number => {
                     Some(ValueType::Number(tokens.slice().parse::<f32>().unwrap()))
                 }
-                // TokenType::String => Some(ValueType::String(tokens.slice().to_string())),
+                TokenType::String => Some(ValueType::String(interner.intern(tokens.slice()))),
                 TokenType::True => Some(ValueType::Boolean(true)),
                 TokenType::False => Some(ValueType::Boolean(false)),
                 TokenType::NIL => Some(ValueType::Nil),
@@ -327,6 +331,7 @@ impl Compiler {
                     span: 0..0,
                 },
             },
+            // interner,
         }
     }
 
@@ -389,11 +394,18 @@ impl Compiler {
     }
 
     fn number(&mut self) {
-        // let value = self.parser.previous.lexeme.parse::<Value>().unwrap();
-
         let value = match self.parser.previous.literal.clone() {
             Some(value) => value,
             _ => panic!("Error: Expected a number."),
+        };
+
+        self.emit_constant(value);
+    }
+
+    fn string(&mut self) {
+        let value = match self.parser.previous.literal.clone() {
+            Some(value) => value,
+            _ => panic!("Error: Expected a string."),
         };
 
         self.emit_constant(value);

@@ -6,10 +6,12 @@
 //     // Lists, Dicts, Tensors, etc.
 // }
 
+use crate::interner::StringObjIdx;
+
 #[derive(Debug, Clone, Copy)]
 pub enum ValueType {
     Number(f32), // TODO: Ideally, it should be seperate types for int and float (maybe?)
-    // String(String),
+    String(StringObjIdx),
     Boolean(bool),
     Nil,
     // Lists, Dicts, Tensors, etc.
@@ -19,7 +21,7 @@ impl std::fmt::Display for ValueType {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
             ValueType::Number(n) => write!(f, "{}", n),
-            // ValueType::String(s) => write!(f, "{}", s),
+            ValueType::String(s) => write!(f, "{}", s),
             ValueType::Boolean(b) => write!(f, "{}", b),
             ValueType::Nil => write!(f, "nil"),
         }
@@ -33,6 +35,7 @@ impl std::ops::Add for ValueType {
     fn add(self, other: Self) -> Self {
         match (self, other) {
             (ValueType::Number(a), ValueType::Number(b)) => ValueType::Number(a + b),
+            (ValueType::String(a), ValueType::String(b)) => ValueType::String(a + b),
             _ => panic!("Operands must be numbers."),
         }
     }
@@ -116,29 +119,15 @@ impl std::cmp::PartialOrd for ValueType {
 
 #[derive(Debug, Clone)]
 pub struct ValueArray {
-    // pub count: usize,
-    // capacity: usize,
     pub values: Vec<ValueType>,
 }
 
 impl ValueArray {
     pub(crate) fn new() -> Self {
-        Self {
-            // count: 0,
-            // capacity: 0,
-            values: Vec::new(),
-        }
+        Self { values: Vec::new() }
     }
 
     pub(crate) fn write(&mut self, value: ValueType) {
-        // if self.capacity < self.count + 1 {
-        //     self.capacity = std::cmp::max(8, self.capacity * 2); // grow capacity by 2x
-        //     self.values.resize(self.capacity, 0.); // resize the code vector to the new capacity
-        // }
-
-        // self.values[self.count] = value;
-        // self.count += 1;
-
         self.values.push(value);
     }
 
