@@ -87,6 +87,35 @@ impl Disassemble for chunk::Chunk {
                 println!("{}", instruction);
                 return offset + 1;
             }
+            chunk::OpCode::OpPop => {
+                println!("{}", instruction);
+                return offset + 1;
+            }
+            chunk::OpCode::OpDefineGlobal => {
+                let constant = self.code[offset + 1];
+                println!(
+                    "{} {:04} | {}",
+                    instruction, constant, self.constants.values[constant as usize]
+                );
+                return offset + 2;
+            }
+            chunk::OpCode::OpGetGlobal => {
+                let constant = self.code[offset + 1];
+                println!(
+                    "{} {:04} | {}",
+                    instruction, constant, self.constants.values[constant as usize]
+                );
+                return offset + 2;
+            }
+            chunk::OpCode::OpSetGlobal => {
+                let constant = self.code[offset + 1];
+                println!(
+                    "{} {:04} | {}",
+                    instruction, constant, self.constants.values[constant as usize]
+                );
+                return offset + 2;
+            }
+
         }
     }
 }

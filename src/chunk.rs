@@ -17,7 +17,11 @@ pub enum OpCode {
     OpGreater,
     OpLess,
     OpReturn,
-    OpPrint
+    OpPrint,
+    OpPop,
+    OpDefineGlobal,
+    OpGetGlobal,
+    OpSetGlobal,
 }
 
 impl From<OpCode> for usize {
@@ -38,6 +42,10 @@ impl From<OpCode> for usize {
             OpCode::OpGreater => 12,
             OpCode::OpLess => 13,
             OpCode::OpPrint => 14,
+            OpCode::OpPop => 15,
+            OpCode::OpDefineGlobal => 16,
+            OpCode::OpGetGlobal => 17,
+            OpCode::OpSetGlobal => 18,
         }
     }
 }
@@ -60,6 +68,10 @@ impl From<usize> for OpCode {
             12 => OpCode::OpGreater,
             13 => OpCode::OpLess,
             14 => OpCode::OpPrint,
+            15 => OpCode::OpPop,
+            16 => OpCode::OpDefineGlobal,
+            17 => OpCode::OpGetGlobal,
+            18 => OpCode::OpSetGlobal,
             _ => panic!("Unknown opcode: {}", byte),
         }
     }
@@ -83,6 +95,10 @@ impl std::fmt::Display for OpCode {
             OpCode::OpGreater => write!(f, "OP_GREATER"),
             OpCode::OpLess => write!(f, "OP_LESS"),
             OpCode::OpPrint => write!(f, "OP_PRINT"),
+            OpCode::OpPop => write!(f, "OP_POP"),
+            OpCode::OpDefineGlobal => write!(f, "OP_DEFINE_GLOBAL"),
+            OpCode::OpGetGlobal => write!(f, "OP_GET_GLOBAL"),
+            OpCode::OpSetGlobal => write!(f, "OP_SET_GLOBAL"),
         }
     }
 }

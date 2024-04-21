@@ -12,6 +12,7 @@ use crate::interner::StringObjIdx;
 pub enum ValueType {
     Number(f32), // TODO: Ideally, it should be seperate types for int and float (maybe?)
     String(StringObjIdx),
+    Identifier(StringObjIdx),
     Boolean(bool),
     Nil,
     // Lists, Dicts, Tensors, etc.
@@ -22,6 +23,7 @@ impl std::fmt::Display for ValueType {
         match self {
             ValueType::Number(n) => write!(f, "{}", n),
             ValueType::String(s) => write!(f, "{}", s),
+            ValueType::Identifier(s) => write!(f, "{}", s),
             ValueType::Boolean(b) => write!(f, "{}", b),
             ValueType::Nil => write!(f, "nil"),
         }

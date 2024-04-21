@@ -37,16 +37,16 @@ enum Precedence {
     PREC_PRIMARY,
 }
 
-pub type ParseFn = fn(&mut Compiler) -> ();
+pub type ParseFn<'src> = fn(&mut Compiler<'src>) -> ();
 
-struct ParseRule {
-    prefix: Option<ParseFn>,
-    infix: Option<ParseFn>,
+struct ParseRule<'src> {
+    prefix: Option<ParseFn<'src>>,
+    infix: Option<ParseFn<'src>>,
     precedence: Precedence,
 }
 
-impl ParseRule {
-    fn get_rule(token_type: TokenType) -> ParseRule {
+impl<'src> ParseRule<'src> {
+    fn get_rule(token_type: TokenType) -> ParseRule<'src> {
         match token_type {
             TokenType::LEFT_PAREN => ParseRule {
                 prefix: Some(Compiler::grouping),
@@ -169,7 +169,7 @@ impl ParseRule {
                 precedence: Precedence::PREC_ASSIGNMENT,
             },
             TokenType::Identifier => ParseRule {
-                prefix: None,
+                prefix: Some(Compiler::variable),
                 infix: None,
                 precedence: Precedence::PREC_NONE,
             },
@@ -262,17 +262,17 @@ impl ParseRule {
     }
 }
 
-pub(crate) struct Compiler {
+pub(crate) struct Compiler<'src> {
     chunk: Chunk,
     pub tokens_vec: Vec<Token>,
     // pub tokens : Vec<(Result<TokenType, LexingError>, std::ops::Range<usize>)>,
     current_token: usize,
 
     parser: Parser,
-    // interner: &'src mut Interner,
+    interner: &'src mut Interner,
 }
 
-impl Compiler {
+impl<'src> Compiler<'src> {
     pub fn new(source: String, interner: &mut Interner) -> Compiler {
         let mut tokens = TokenType::lexer(&source);
         // remove the lifetime from the tokens without use_ref
@@ -331,7 +331,7 @@ impl Compiler {
                     span: 0..0,
                 },
             },
-            // interner,
+            interner,
         }
     }
 
@@ -339,7 +339,11 @@ impl Compiler {
         // TODO : 17.2.1 - Handling syntax errors
 
         self.advance();
-        self.expression();
+
+        while self.parser.current.token_type != TokenType::EOF {
+            self.declaration();
+        }
+
         self.end_compiler();
         Ok(self.chunk.clone())
     }
@@ -348,7 +352,7 @@ impl Compiler {
         self.parser.previous = self.parser.current.clone();
 
         loop {
-            if self.current_token >= self.tokens_vec.len() {
+            if self.current_token >= (self.tokens_vec.len()) {
                 self.parser.current = Token {
                     token_type: TokenType::EOF,
                     lexeme: "".to_string(),
@@ -373,8 +377,18 @@ impl Compiler {
         if self.parser.current.token_type == token_type {
             self.advance();
             return;
+        } else {
+            panic!("Error: {}", message);
         }
         // self.error_at_current(message);
+    }
+
+    fn matches(&mut self, token_type: TokenType) -> bool {
+        if self.parser.current.token_type == token_type {
+            self.advance();
+            return true;
+        }
+        false
     }
 
     fn emit_byte(&mut self, byte: usize) {
@@ -411,8 +425,67 @@ impl Compiler {
         self.emit_constant(value);
     }
 
+    fn variable(&mut self) {
+        self.named_variable(&self.parser.previous.clone());
+    }
+
+    fn named_variable(&mut self, name: &Token) {
+        let arg = self.identifier_constant(name);
+        // self.emit_bytes(usize::from(OpCode::OpGetGlobal), arg);
+
+        if self.matches(TokenType::EQUAL) {
+            self.expression();
+        } else {
+            self.emit_bytes(usize::from(OpCode::OpGetGlobal), arg);
+        }
+    }
+
     fn expression(&mut self) {
         self.parse_precedence(Precedence::PREC_ASSIGNMENT);
+    }
+
+    fn let_declaration(&mut self) {
+        let global = self.parse_variable("Expect variable name.");
+
+        self.consume(TokenType::EQUAL, "Expect '=' after variable name.");
+
+        self.expression();
+
+        self.consume(TokenType::SEMICOLON, "Expect ';' after value.");
+
+        self.emit_bytes(usize::from(OpCode::OpDefineGlobal), global);
+    }
+
+    fn expression_statement(&mut self) {
+        self.expression();
+        self.consume(TokenType::SEMICOLON, "Expect ';' after expression.");
+        self.emit_byte(usize::from(OpCode::OpPop));
+    }
+
+    fn print_statement(&mut self) {
+        self.consume(TokenType::LEFT_PAREN, "Expect '(' after 'print'.");
+        self.expression();
+        self.consume(TokenType::RIGHT_PAREN, "Expect ')' after value.");
+        self.consume(TokenType::SEMICOLON, "Expect ';' after value.");
+        self.emit_byte(usize::from(OpCode::OpPrint));
+    }
+
+    // TODO: ch21 - synchronize
+
+    fn declaration(&mut self) {
+        if self.matches(TokenType::LET) {
+            self.let_declaration();
+        } else {
+            self.statement();
+        }
+    }
+
+    fn statement(&mut self) {
+        if self.matches(TokenType::PRINT) {
+            self.print_statement();
+        } else {
+            self.expression_statement();
+        }
     }
 
     fn emit_constant(&mut self, value: ValueType) {
@@ -463,6 +536,16 @@ impl Compiler {
                 None => {}
             }
         }
+    }
+
+    fn parse_variable(&mut self, error_message: &str) -> usize {
+        self.consume(TokenType::Identifier, error_message);
+
+        self.identifier_constant(&self.parser.previous.clone())
+    }
+
+    fn identifier_constant(&mut self, name: &Token) -> usize {
+        self.chunk.add_constant(ValueType::Identifier(self.interner.intern(&name.lexeme)))
     }
 
     fn binary(&mut self) {

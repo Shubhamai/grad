@@ -1,8 +1,10 @@
+use std::collections::HashMap;
+
 use crate::{
     chunk::{self, Chunk, OpCode},
     compiler::Compiler,
     debug::Disassemble,
-    interner::Interner,
+    interner::{Interner, StringObjIdx},
     value::ValueType,
 };
 
@@ -20,6 +22,8 @@ pub(crate) struct VM {
     stack_top: usize,
 
     interner: Interner,
+
+    globals: HashMap<StringObjIdx, ValueType>,
 }
 
 pub enum InterpretResult {
@@ -39,6 +43,7 @@ impl VM {
             stack: core::array::from_fn(|i| ValueType::Nil),
             stack_top: 0,
             interner: Interner::default(),
+            globals: HashMap::new(),
         }
     }
 
@@ -80,8 +85,8 @@ impl VM {
 
             match instruction {
                 chunk::OpCode::OpReturn => {
-                    println!("{}", self.pop());
-                    return InterpretResult::INTERPRET_OK;
+                    // println!("{}", self.pop());
+                    // return InterpretResult::INTERPRET_OK;
                 }
                 chunk::OpCode::OpAdd => {
                     if let ValueType::String(_) = self.peek(0) {
@@ -146,6 +151,60 @@ impl VM {
                 }
                 chunk::OpCode::OpPrint => {
                     println!("{}", self.pop());
+                }
+                chunk::OpCode::OpPop => {
+                    self.pop();
+                }
+                chunk::OpCode::OpDefineGlobal => {
+                    let index = self.read_byte();
+                    let constant = self.read_constant(index as usize);
+
+                    let value = self.peek(0);
+
+                    if let ValueType::Identifier(idx) = constant {
+                        self.globals.insert(idx, value);
+                    }
+
+                    self.pop();
+                }
+                chunk::OpCode::OpGetGlobal => {
+                    let index = self.read_byte();
+                    let constant = self.read_constant(index as usize);
+
+                    match constant {
+                        ValueType::Identifier(idx) => {
+                            let value = self.globals.get(&idx);
+                            match value {
+                                Some(value) => {
+                                    self.push(*value);
+                                }
+                                None => {
+                                    println!("Undefined variable");
+                                    return InterpretResult::INTERPRET_RUNTIME_ERROR;
+                                }
+                            }
+                        }
+                        _ => {
+                            println!("Invalid global variable");
+                            return InterpretResult::INTERPRET_RUNTIME_ERROR;
+                        }
+                    }
+                }
+                chunk::OpCode::OpSetGlobal => {
+                    let index = self.read_byte();
+                    let constant = self.read_constant(index as usize);
+
+                    match constant {
+                        ValueType::Identifier(idx) => {
+                            let value = self.peek(0);
+                            self.globals.insert(idx, value);
+                            // TODO - only set the value if it exists
+                        }
+                        _ => {
+                            println!("Invalid global variable");
+                            return InterpretResult::INTERPRET_RUNTIME_ERROR;
+                        }
+                    }
                 }
             }
         }
