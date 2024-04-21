@@ -21,7 +21,7 @@ pub(crate) struct VM {
     stack: [ValueType; STACK_MAX],
     stack_top: usize,
 
-    interner: Interner,
+    pub interner: Interner,
 
     globals: HashMap<StringObjIdx, ValueType>,
 }
@@ -67,6 +67,8 @@ impl VM {
         self.chunk = chunk;
         self.ip = 0;
 
+        self.disassemble("code");
+
         let result = self.run();
 
         self.chunk.free();
@@ -86,7 +88,7 @@ impl VM {
             match instruction {
                 chunk::OpCode::OpReturn => {
                     // println!("{}", self.pop());
-                    // return InterpretResult::INTERPRET_OK;
+                    return InterpretResult::INTERPRET_OK;
                 }
                 chunk::OpCode::OpAdd => {
                     if let ValueType::String(_) = self.peek(0) {
@@ -111,6 +113,19 @@ impl VM {
                     let b = self.pop();
                     let a = self.pop();
                     self.push(a / b);
+                }
+                chunk::OpCode::OpPower => {
+                    let b = self.pop();
+                    let a = self.pop();
+                    match (a, b) {
+                        (ValueType::Number(a), ValueType::Number(b)) => {
+                            self.push(ValueType::Number(a.powf(b)));
+                        }
+                        _ => {
+                            println!("Operands must be numbers.");
+                            return InterpretResult::INTERPRET_RUNTIME_ERROR;
+                        }
+                    }
                 }
                 chunk::OpCode::OpNegate => {
                     let value = self.pop();

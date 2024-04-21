@@ -82,6 +82,4 @@ fn run_source(src: &str) {
     //         println!("Interpret ok");
     //     }
     // }
-
-    vm.free();
 }

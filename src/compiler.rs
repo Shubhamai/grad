@@ -37,7 +37,7 @@ enum Precedence {
     PREC_PRIMARY,
 }
 
-pub type ParseFn<'src> = fn(&mut Compiler<'src>) -> ();
+pub type ParseFn<'src> = fn(&mut Compiler<'src>, bool);
 
 struct ParseRule<'src> {
     prefix: Option<ParseFn<'src>>,
@@ -90,8 +90,8 @@ impl<'src> ParseRule<'src> {
             },
             TokenType::HAT => ParseRule {
                 prefix: None,
-                infix: None,
-                precedence: Precedence::PREC_NONE,
+                infix: Some(Compiler::binary),
+                precedence: Precedence::PREC_FACTOR,
             },
             TokenType::SEMICOLON => ParseRule {
                 prefix: None,
@@ -302,6 +302,11 @@ impl<'src> Compiler<'src> {
                 _ => None,
             };
 
+            // skip comments
+            if token == TokenType::COMMENT {
+                continue;
+            }
+
             tokens_vec.push(Token {
                 token_type: token,
                 lexeme: tokens.slice().to_string(),
@@ -404,10 +409,10 @@ impl<'src> Compiler<'src> {
         self.emit_byte(usize::from(OpCode::OpReturn));
 
         // debug
-        self.chunk.disassemble("code");
+        // self.disassemble("code");
     }
 
-    fn number(&mut self) {
+    fn number(&mut self, can_assign: bool) {
         let value = match self.parser.previous.literal.clone() {
             Some(value) => value,
             _ => panic!("Error: Expected a number."),
@@ -416,7 +421,7 @@ impl<'src> Compiler<'src> {
         self.emit_constant(value);
     }
 
-    fn string(&mut self) {
+    fn string(&mut self, can_assign: bool) {
         let value = match self.parser.previous.literal.clone() {
             Some(value) => value,
             _ => panic!("Error: Expected a string."),
@@ -425,15 +430,15 @@ impl<'src> Compiler<'src> {
         self.emit_constant(value);
     }
 
-    fn variable(&mut self) {
-        self.named_variable(&self.parser.previous.clone());
+    fn variable(&mut self, can_assign: bool) {
+        self.named_variable(&self.parser.previous.clone(), can_assign);
     }
 
-    fn named_variable(&mut self, name: &Token) {
+    fn named_variable(&mut self, name: &Token, can_assign: bool) {
         let arg = self.identifier_constant(name);
         // self.emit_bytes(usize::from(OpCode::OpGetGlobal), arg);
 
-        if self.matches(TokenType::EQUAL) {
+        if can_assign && self.matches(TokenType::EQUAL) {
             self.expression();
         } else {
             self.emit_bytes(usize::from(OpCode::OpGetGlobal), arg);
@@ -493,12 +498,12 @@ impl<'src> Compiler<'src> {
         self.emit_bytes(usize::from(OpCode::OpConstant), constant);
     }
 
-    fn grouping(&mut self) {
+    fn grouping(&mut self, can_assign: bool) {
         self.expression();
         self.consume(TokenType::RIGHT_PAREN, "Expect ')' after expression.");
     }
 
-    fn unary(&mut self) {
+    fn unary(&mut self, can_assign: bool) {
         let operator_type = self.parser.previous.token_type;
 
         self.parse_precedence(Precedence::PREC_UNARY);
@@ -520,8 +525,9 @@ impl<'src> Compiler<'src> {
             return;
         }
 
+        let can_assign = precedence as i32 <= Precedence::PREC_ASSIGNMENT as i32;
         match prefix_rule {
-            Some(rule) => rule(self),
+            Some(rule) => rule(self, can_assign),
             None => {}
         }
 
@@ -532,8 +538,13 @@ impl<'src> Compiler<'src> {
             let infix_rule = ParseRule::get_rule(self.parser.previous.token_type).infix;
 
             match infix_rule {
-                Some(rule) => rule(self),
+                Some(rule) => rule(self, can_assign),
                 None => {}
+            }
+
+            if can_assign && self.matches(TokenType::EQUAL) {
+                // self.error("Invalid assignment target.");
+                println!("Invalid assignment target.");
             }
         }
     }
@@ -545,10 +556,11 @@ impl<'src> Compiler<'src> {
     }
 
     fn identifier_constant(&mut self, name: &Token) -> usize {
-        self.chunk.add_constant(ValueType::Identifier(self.interner.intern(&name.lexeme)))
+        self.chunk
+            .add_constant(ValueType::Identifier(self.interner.intern(&name.lexeme)))
     }
 
-    fn binary(&mut self) {
+    fn binary(&mut self, can_assign: bool) {
         let operator_type = self.parser.previous.token_type;
 
         let rule = ParseRule::get_rule(operator_type);
@@ -560,6 +572,7 @@ impl<'src> Compiler<'src> {
             TokenType::MINUS => self.emit_byte(usize::from(OpCode::OpSubtract)),
             TokenType::STAR => self.emit_byte(usize::from(OpCode::OpMultiply)),
             TokenType::SLASH => self.emit_byte(usize::from(OpCode::OpDivide)),
+            TokenType::HAT => self.emit_byte(usize::from(OpCode::OpPower)),
             TokenType::BANG_EQUAL => {
                 self.emit_bytes(usize::from(OpCode::OpEqual), usize::from(OpCode::OpNot))
             }
@@ -576,7 +589,7 @@ impl<'src> Compiler<'src> {
         }
     }
 
-    fn literal(&mut self) {
+    fn literal(&mut self, can_assign: bool) {
         match self.parser.previous.token_type {
             TokenType::True => self.emit_byte(usize::from(OpCode::OpTrue)),
             TokenType::False => self.emit_byte(usize::from(OpCode::OpFalse)),

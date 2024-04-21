@@ -1,4 +1,4 @@
-use crate::chunk::{self, OpCode};
+use crate::{chunk::{self, OpCode}, vm::VM};
 
 // impl disassemble chunk trait for  chunk class
 
@@ -7,12 +7,11 @@ pub trait Disassemble {
     fn disassemble(&self, name: &str);
 }
 
-impl Disassemble for chunk::Chunk {
+impl Disassemble for VM {
     fn disassemble(&self, name: &str) {
-        println!("== {} ==", name);
 
         let mut offset = 0;
-        while offset < self.code.len() {
+        while offset < self.chunk.code.len() {
             offset = self.disassemble_instruction(offset);
         }
     }
@@ -20,7 +19,7 @@ impl Disassemble for chunk::Chunk {
     fn disassemble_instruction(&self, offset: usize) -> usize {
         print!("{:04} ", offset);
 
-        let instruction = OpCode::from(self.code[offset]);
+        let instruction = OpCode::from(self.chunk.code[offset]);
 
         match instruction {
             chunk::OpCode::OpReturn => {
@@ -47,11 +46,15 @@ impl Disassemble for chunk::Chunk {
                 println!("{}", instruction);
                 return offset + 1;
             }
+            chunk::OpCode::OpPower => {
+                println!("{}", instruction);
+                return offset + 1;
+            }
             chunk::OpCode::OpConstant => {
-                let constant = self.code[offset + 1];
+                let constant = self.chunk.code[offset + 1];
                 println!(
                     "{} {:04} | {}",
-                    instruction, constant, self.constants.values[constant as usize]
+                    instruction, constant, self.chunk.constants.values[constant as usize]
                 );
                 return offset + 2;
             }
@@ -92,26 +95,26 @@ impl Disassemble for chunk::Chunk {
                 return offset + 1;
             }
             chunk::OpCode::OpDefineGlobal => {
-                let constant = self.code[offset + 1];
+                let constant = self.chunk.code[offset + 1];
                 println!(
                     "{} {:04} | {}",
-                    instruction, constant, self.constants.values[constant as usize]
+                    instruction, constant, self.chunk.constants.values[constant as usize]
                 );
                 return offset + 2;
             }
             chunk::OpCode::OpGetGlobal => {
-                let constant = self.code[offset + 1];
+                let constant = self.chunk.code[offset + 1];
                 println!(
                     "{} {:04} | {}",
-                    instruction, constant, self.constants.values[constant as usize]
+                    instruction, constant, self.chunk.constants.values[constant as usize]
                 );
                 return offset + 2;
             }
             chunk::OpCode::OpSetGlobal => {
-                let constant = self.code[offset + 1];
+                let constant = self.chunk.code[offset + 1];
                 println!(
                     "{} {:04} | {}",
-                    instruction, constant, self.constants.values[constant as usize]
+                    instruction, constant, self.chunk.constants.values[constant as usize]
                 );
                 return offset + 2;
             }
