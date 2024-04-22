@@ -1,7 +1,6 @@
-use std::alloc::realloc;
+use crate::value::ValueType;
 
-use crate::value::{ValueArray, ValueType};
-
+#[derive(Debug, Clone, Copy)]
 pub enum OpCode {
     OpConstant,
     OpNil,
@@ -13,7 +12,7 @@ pub enum OpCode {
     OpMultiply,
     OpDivide,
     OpNot,
-    OpEqual,
+    OpEqualEqual,
     OpGreater,
     OpLess,
     OpReturn,
@@ -22,62 +21,7 @@ pub enum OpCode {
     OpDefineGlobal,
     OpGetGlobal,
     OpSetGlobal,
-    OpPower
-}
-
-impl From<OpCode> for usize {
-    fn from(op: OpCode) -> usize {
-        match op {
-            OpCode::OpReturn => 0,
-            OpCode::OpConstant => 1,
-            OpCode::OpNegate => 2,
-            OpCode::OpAdd => 3,
-            OpCode::OpSubtract => 4,
-            OpCode::OpMultiply => 5,
-            OpCode::OpDivide => 6,
-            OpCode::OpNil => 7,
-            OpCode::OpTrue => 8,
-            OpCode::OpFalse => 9,
-            OpCode::OpNot => 10,
-            OpCode::OpEqual => 11,
-            OpCode::OpGreater => 12,
-            OpCode::OpLess => 13,
-            OpCode::OpPrint => 14,
-            OpCode::OpPop => 15,
-            OpCode::OpDefineGlobal => 16,
-            OpCode::OpGetGlobal => 17,
-            OpCode::OpSetGlobal => 18,
-            OpCode::OpPower => 19
-        }
-    }
-}
-
-impl From<usize> for OpCode {
-    fn from(byte: usize) -> OpCode {
-        match byte {
-            0 => OpCode::OpReturn,
-            1 => OpCode::OpConstant,
-            2 => OpCode::OpNegate,
-            3 => OpCode::OpAdd,
-            4 => OpCode::OpSubtract,
-            5 => OpCode::OpMultiply,
-            6 => OpCode::OpDivide,
-            7 => OpCode::OpNil,
-            8 => OpCode::OpTrue,
-            9 => OpCode::OpFalse,
-            10 => OpCode::OpNot,
-            11 => OpCode::OpEqual,
-            12 => OpCode::OpGreater,
-            13 => OpCode::OpLess,
-            14 => OpCode::OpPrint,
-            15 => OpCode::OpPop,
-            16 => OpCode::OpDefineGlobal,
-            17 => OpCode::OpGetGlobal,
-            18 => OpCode::OpSetGlobal,
-            19 => OpCode::OpPower,
-            _ => panic!("Unknown opcode: {}", byte),
-        }
-    }
+    OpPower,
 }
 
 impl std::fmt::Display for OpCode {
@@ -94,7 +38,7 @@ impl std::fmt::Display for OpCode {
             OpCode::OpTrue => write!(f, "OP_TRUE"),
             OpCode::OpFalse => write!(f, "OP_FALSE"),
             OpCode::OpNot => write!(f, "OP_NOT"),
-            OpCode::OpEqual => write!(f, "OP_EQUAL"),
+            OpCode::OpEqualEqual => write!(f, "OP_EQUAL"),
             OpCode::OpGreater => write!(f, "OP_GREATER"),
             OpCode::OpLess => write!(f, "OP_LESS"),
             OpCode::OpPrint => write!(f, "OP_PRINT"),
@@ -107,55 +51,46 @@ impl std::fmt::Display for OpCode {
     }
 }
 
+#[derive(Debug, Clone, Copy)]
+pub enum VectorType {
+    Constant(usize),
+    Code(OpCode),
+}
+
+impl std::fmt::Display for VectorType {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            VectorType::Constant(c) => write!(f, "index->[{}]", c),
+            VectorType::Code(op) => write!(f, "{}", op),
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct Chunk {
-    // pub count: usize,
-    // capacity: usize,
-
-    // TODO: I am using 4/8 bytes for the instruction, but I should be using a byte
-    pub code: Vec<usize>,
-    pub lines: Vec<usize>,
-
-    pub constants: ValueArray,
+    pub code: Vec<VectorType>,
+    pub constants: Vec<ValueType>,
 }
 
 impl Chunk {
     pub fn new() -> Self {
         Self {
-            // count: 0,
-            // capacity: 0,
             code: Vec::new(),
-            lines: Vec::new(),
-            constants: ValueArray::new(),
+            constants: Vec::new(),
         }
     }
 
-    pub fn write(&mut self, byte: usize, line: usize) {
-        // if self.capacity < self.count + 1 {
-        //     self.capacity = std::cmp::max(8, self.capacity * 2); // grow capacity by 2x
-        //     self.code.resize(self.capacity, 0); // resize the code vector to the new capacity
-        //     self.lines.resize(self.capacity, 0); // resize the lines vector to the new capacity
-        // }
-
-        // self.code[self.count] = byte;
-        // self.lines[self.count] = line;
-        // self.count += 1;
-
+    pub fn write(&mut self, byte: VectorType) {
         self.code.push(byte);
-        self.lines.push(line);
     }
 
     pub fn add_constant(&mut self, value: ValueType) -> usize {
-        self.constants.write(value);
-        self.constants.values.len() - 1 // return the index of the constant
+        self.constants.push(value);
+        self.constants.len() - 1 // return the index of the constant
     }
 
-    pub fn free(&mut self) {
-        self.code.clear();
-
-        // self.capacity = 0;
-        // self.count = 0;
-
-        self.constants.free();
-    }
+    // pub fn free(&mut self) {
+    //    self.code.clear();
+    //    self.constants.clear();
+    // }
 }

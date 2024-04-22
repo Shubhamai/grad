@@ -4,17 +4,17 @@ use crate::scanner::{Lexer, TokenType};
 use std::fmt;
 
 #[derive(Debug, Clone)]
-pub enum S {
+pub enum ASTNode {
     Number(f64),
     Identifier(String),
     Boolean(bool),
     String(String),
-    Op(Ops, Vec<S>),
-    Callee(String, Vec<S>), // function call with arguments
+    Op(Ops, Vec<ASTNode>),
+    Callee(String, Vec<ASTNode>), // function call with arguments
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
-enum BinaryOp {
+pub enum BinaryOp {
     Add,
     Sub,
     Mul,
@@ -31,18 +31,18 @@ enum BinaryOp {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
-enum UnaryOp {
+pub enum UnaryOp {
     Not, // ! - logical not
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
-enum PostfixOp {
+pub enum PostfixOp {
     Index,
     Call,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
-enum Ops {
+pub enum Ops {
     BinaryOp(BinaryOp),
     UnaryOp(UnaryOp),
     PostfixOp(PostfixOp),
@@ -72,21 +72,21 @@ impl fmt::Display for Ops {
     }
 }
 
-impl fmt::Display for S {
+impl fmt::Display for ASTNode {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            S::Number(i) => write!(f, "{}", i),
-            S::Identifier(s) => write!(f, "{}", s),
-            S::Boolean(b) => write!(f, "{}", b),
-            S::String(s) => write!(f, "{}", s),
-            S::Callee(callee, args) => {
+            ASTNode::Number(i) => write!(f, "{}", i),
+            ASTNode::Identifier(s) => write!(f, "{}", s),
+            ASTNode::Boolean(b) => write!(f, "{}", b),
+            ASTNode::String(s) => write!(f, "{}", s),
+            ASTNode::Callee(callee, args) => {
                 write!(f, "({}", callee)?;
                 for arg in args {
                     write!(f, " {}", arg)?;
                 }
                 write!(f, ")")
             }
-            S::Op(head, rest) => {
+            ASTNode::Op(head, rest) => {
                 write!(f, "({}", head)?;
                 for s in rest {
                     write!(f, " {}", s)?
@@ -97,19 +97,14 @@ impl fmt::Display for S {
     }
 }
 
-pub fn expr(source: &str) -> S {
-    let mut lexer = Lexer::new(source.to_string());
-    expr_bp(&mut lexer, 0)
-}
-
-fn expr_bp(lexer: &mut Lexer, min_bp: u8) -> S {
+pub fn expr_bp(lexer: &mut Lexer, min_bp: u8) -> ASTNode {
     let current_token = lexer.next();
 
     let mut lhs = match current_token.token_type {
-        TokenType::Number(it) => S::Number(it),
-        TokenType::Identifier => S::Identifier(current_token.lexeme),
-        TokenType::Boolean(it) => S::Boolean(it),
-        TokenType::String => S::String(current_token.lexeme),
+        TokenType::Number(it) => ASTNode::Number(it),
+        TokenType::Identifier => ASTNode::Identifier(current_token.lexeme),
+        TokenType::Boolean(it) => ASTNode::Boolean(it),
+        TokenType::String => ASTNode::String(current_token.lexeme),
         TokenType::LEFT_PAREN => {
             let lhs = expr_bp(lexer, 0);
             assert_eq!(lexer.next().token_type, TokenType::RIGHT_PAREN);
@@ -151,7 +146,7 @@ fn expr_bp(lexer: &mut Lexer, min_bp: u8) -> S {
             let ((), r_bp) = prefix_binding_power(op);
             let rhs = expr_bp(lexer, r_bp);
             // print!("{} ", op);
-            S::Op(op, vec![rhs])
+            ASTNode::Op(op, vec![rhs])
         }
         t => panic!("bad token: {:?}", t),
     };
@@ -192,7 +187,7 @@ fn expr_bp(lexer: &mut Lexer, min_bp: u8) -> S {
             lhs = if op == Ops::PostfixOp(PostfixOp::Index) {
                 let rhs = expr_bp(lexer, 0);
                 assert_eq!(lexer.next().token_type, TokenType::RIGHT_BRACKET);
-                S::Op(op, vec![lhs, rhs])
+                ASTNode::Op(op, vec![lhs, rhs])
             } else if op == Ops::PostfixOp(PostfixOp::Call) {
                 // identifier
                 let callee_token = lexer.next();
@@ -224,17 +219,17 @@ fn expr_bp(lexer: &mut Lexer, min_bp: u8) -> S {
                 // }
 
                 lexer.next();
-                S::Op(
+                ASTNode::Op(
                     op,
                     // vec![
                     //     lhs,
                     //     S::Identifier(callee_token.lexeme),
                     //     S::Op(Ops::PostfixOp(PostfixOp::Args), args),
                     // ],
-                    vec![lhs, S::Callee(callee_token.lexeme, args)],
+                    vec![lhs, ASTNode::Callee(callee_token.lexeme, args)],
                 )
             } else {
-                S::Op(op, vec![lhs])
+                ASTNode::Op(op, vec![lhs])
             };
             continue;
         }
@@ -256,7 +251,7 @@ fn expr_bp(lexer: &mut Lexer, min_bp: u8) -> S {
             //     S::Cons(op, vec![lhs, rhs])
             // };
             let rhs = expr_bp(lexer, r_bp);
-            lhs = S::Op(op, vec![lhs, rhs]);
+            lhs = ASTNode::Op(op, vec![lhs, rhs]);
             continue;
         }
 
@@ -309,85 +304,79 @@ fn infix_binding_power(op: Ops) -> Option<(u8, u8)> {
     Some(res)
 }
 
-#[test]
-fn tests() {
-    let s = expr("1");
-    assert_eq!(s.to_string(), "1");
-
-    let s = expr("1 + 2 * 3");
-    assert_eq!(s.to_string(), "(+ 1 (* 2 3))");
-
-    let s = expr("(1 + 2) * 3");
-    assert_eq!(s.to_string(), "(* (+ 1 2) 3)");
-
-    let s = expr("a + b * c * d + e");
-    assert_eq!(s.to_string(), "(+ (+ a (* (* b c) d)) e)");
-
-    let s = expr("f @ g @ h");
-    assert_eq!(s.to_string(), "(@ f (@ g h))");
-
-    let s = expr("1 + 2 + f @ g @ h * 3 * 4");
-    assert_eq!(s.to_string(), "(+ (+ 1 2) (* (* (@ f (@ g h)) 3) 4))");
-
-    let s = expr("--1 * 2");
-    assert_eq!(s.to_string(), "(* (- (- 1)) 2)");
-
-    let s = expr("--f @ g");
-    assert_eq!(s.to_string(), "(@ (- (- f)) g)");
-
-    // let s = expr(r""sfsad"+"sdf"--4");
-    // assert_eq!(s.to_string(), "(+ \"sfsad\" \"sdf\" (- (- 4))");
-
-    let s = expr("-!9");
-    assert_eq!(s.to_string(), "(- (! 9))");
-
-    let s = expr("! f @ g ");
-    assert_eq!(s.to_string(), "(@ (! f) g)");
-
-    let s = expr("(((0)))");
-    assert_eq!(s.to_string(), "0");
-
-    let s = expr("x[0][1]");
-    assert_eq!(s.to_string(), "([ ([ x 0) 1)");
-
-    let s = expr("x.relu()");
-    assert_eq!(s.to_string(), "(. x (relu))");
-
-    let s = expr("x.relu(0, 1).relu(2, 3)");
-    assert_eq!(s.to_string(), "(. (. x (relu 0 1)) (relu 2 3))");
-
-    let s = expr("x.relu(a.b(0+2), 2-1).max(0)/2");
-    assert_eq!(
-        s.to_string(),
-        "(/ (. (. x (relu (. a (b (+ 0 2))) (- 2 1))) (max 0)) 2)"
-    );
-    // left: "(/ (. (. x relu (, (. a b (, (+ 0 2))) (- 2 1))) max (, 0)) 2)"
-    // right: "(/ (. (. x relu (. a b (+ 0 2))) (- 2 1) max (0)) 2)"
-
-    // let s = expr(
-    //     "a ? b :
-    //      c ? d
-    //      : e",
-    // );
-    // assert_eq!(s.to_string(), "(? a b (? c d e))");
-
-    // let s = expr("a = 0 ? b : c = d");
-    // assert_eq!(s.to_string(), "(= a (= (? 0 b c) d))")
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
     fn test_expr() {
+        fn expr(source: &str) -> ASTNode {
+            let mut lexer = Lexer::new(source.to_string());
+            expr_bp(&mut lexer, 0)
+        }
+
         let s = expr("1");
         assert_eq!(s.to_string(), "1");
 
         let s = expr("1 + 2 * 3");
         assert_eq!(s.to_string(), "(+ 1 (* 2 3))");
 
+        let s = expr("(1 + 2) * 3");
+        assert_eq!(s.to_string(), "(* (+ 1 2) 3)");
+
         let s = expr("a + b * c * d + e");
         assert_eq!(s.to_string(), "(+ (+ a (* (* b c) d)) e)");
+
+        let s = expr("a + b * c * d + e");
+        assert_eq!(s.to_string(), "(+ (+ a (* (* b c) d)) e)");
+
+        let s = expr("f @ g @ h");
+        assert_eq!(s.to_string(), "(@ f (@ g h))");
+
+        let s = expr("1 + 2 + f @ g @ h * 3 * 4");
+        assert_eq!(s.to_string(), "(+ (+ 1 2) (* (* (@ f (@ g h)) 3) 4))");
+
+        let s = expr("--1 * 2");
+        assert_eq!(s.to_string(), "(* (- (- 1)) 2)");
+
+        let s = expr("--f @ g");
+        assert_eq!(s.to_string(), "(@ (- (- f)) g)");
+
+        // let s = expr(r""sfsad"+"sdf"--4");
+        // assert_eq!(s.to_string(), "(+ \"sfsad\" \"sdf\" (- (- 4))");
+
+        let s = expr("-!9");
+        assert_eq!(s.to_string(), "(- (! 9))");
+
+        let s = expr("! f @ g ");
+        assert_eq!(s.to_string(), "(@ (! f) g)");
+
+        let s = expr("(((0)))");
+        assert_eq!(s.to_string(), "0");
+
+        let s = expr("x[0][1]");
+        assert_eq!(s.to_string(), "([ ([ x 0) 1)");
+
+        let s = expr("x.relu()");
+        assert_eq!(s.to_string(), "(. x (relu))");
+
+        let s = expr("x.relu(0, 1).relu(2, 3)");
+        assert_eq!(s.to_string(), "(. (. x (relu 0 1)) (relu 2 3))");
+
+        let s = expr("x.relu(a.b(0+2), 2-1).max(0)/2");
+        assert_eq!(
+            s.to_string(),
+            "(/ (. (. x (relu (. a (b (+ 0 2))) (- 2 1))) (max 0)) 2)"
+        );
+
+        // let s = expr(
+        //     "a ? b :
+        //      c ? d
+        //      : e",
+        // );
+        // assert_eq!(s.to_string(), "(? a b (? c d e))");
+
+        // let s = expr("a = 0 ? b : c = d");
+        // assert_eq!(s.to_string(), "(= a (= (? 0 b c) d))")
     }
 }

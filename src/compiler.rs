@@ -1,602 +1,98 @@
-use logos::{Lexer, Logos};
-
 use crate::{
-    chunk::{Chunk, OpCode},
-    debug::Disassemble,
+    ast::{ASTNode, BinaryOp, Ops},
+    chunk::{Chunk, OpCode, VectorType},
     interner::Interner,
-    scanner::{self, LexingError, TokenType},
     value::ValueType,
 };
 
-#[derive(Debug, PartialEq, Clone)]
-pub struct Token {
-    pub token_type: TokenType,
-    pub lexeme: String,
-    pub literal: Option<ValueType>,
-    pub span: std::ops::Range<usize>,
-}
-
-#[derive(Debug)]
-struct Parser {
-    current: Token,
-    previous: Token,
-}
-
-#[derive(Debug, Clone, Copy)]
-enum Precedence {
-    PREC_NONE,
-    PREC_ASSIGNMENT, // =
-    PREC_OR,         // or
-    PREC_AND,        // and
-    PREC_EQUALITY,   // == !=
-    PREC_COMPARISON, // < > <= >=
-    PREC_TERM,       // + -
-    PREC_FACTOR,     // * /
-    PREC_UNARY,      // ! -
-    PREC_CALL,       // . ()
-    PREC_PRIMARY,
-}
-
-pub type ParseFn<'src> = fn(&mut Compiler<'src>, bool);
-
-struct ParseRule<'src> {
-    prefix: Option<ParseFn<'src>>,
-    infix: Option<ParseFn<'src>>,
-    precedence: Precedence,
-}
-
-impl<'src> ParseRule<'src> {
-    fn get_rule(token_type: TokenType) -> ParseRule<'src> {
-        match token_type {
-            TokenType::LEFT_PAREN => ParseRule {
-                prefix: Some(Compiler::grouping),
-                infix: None,
-                precedence: Precedence::PREC_NONE,
-            },
-            TokenType::RIGHT_PAREN => ParseRule {
-                prefix: None,
-                infix: None,
-                precedence: Precedence::PREC_NONE,
-            },
-            TokenType::LEFT_BRACE => ParseRule {
-                prefix: None,
-                infix: None,
-                precedence: Precedence::PREC_NONE,
-            },
-            TokenType::RIGHT_BRACE => ParseRule {
-                prefix: None,
-                infix: None,
-                precedence: Precedence::PREC_NONE,
-            },
-            TokenType::COMMA => ParseRule {
-                prefix: None,
-                infix: None,
-                precedence: Precedence::PREC_NONE,
-            },
-            TokenType::DOT => ParseRule {
-                prefix: None,
-                infix: None,
-                precedence: Precedence::PREC_NONE,
-            },
-            TokenType::MINUS => ParseRule {
-                prefix: Some(Compiler::unary),
-                infix: Some(Compiler::binary),
-                precedence: Precedence::PREC_TERM,
-            },
-            TokenType::PLUS => ParseRule {
-                prefix: None,
-                infix: Some(Compiler::binary),
-                precedence: Precedence::PREC_TERM,
-            },
-            TokenType::HAT => ParseRule {
-                prefix: None,
-                infix: Some(Compiler::binary),
-                precedence: Precedence::PREC_FACTOR,
-            },
-            TokenType::SEMICOLON => ParseRule {
-                prefix: None,
-                infix: None,
-                precedence: Precedence::PREC_NONE,
-            },
-            TokenType::SLASH => ParseRule {
-                prefix: None,
-                infix: Some(Compiler::binary),
-                precedence: Precedence::PREC_FACTOR,
-            },
-            TokenType::STAR => ParseRule {
-                prefix: None,
-                infix: Some(Compiler::binary),
-                precedence: Precedence::PREC_FACTOR,
-            },
-            TokenType::BANG => ParseRule {
-                prefix: Some(Compiler::unary),
-                infix: None,
-                precedence: Precedence::PREC_NONE,
-            },
-            TokenType::BANG_EQUAL => ParseRule {
-                prefix: None,
-                infix: Some(Compiler::binary),
-                precedence: Precedence::PREC_EQUALITY,
-            },
-            TokenType::EQUAL => ParseRule {
-                prefix: None,
-                infix: None,
-                precedence: Precedence::PREC_NONE,
-            },
-            TokenType::EQUAL_EQUAL => ParseRule {
-                prefix: None,
-                infix: Some(Compiler::binary),
-                precedence: Precedence::PREC_EQUALITY,
-            },
-            TokenType::GREATER => ParseRule {
-                prefix: None,
-                infix: Some(Compiler::binary),
-                precedence: Precedence::PREC_COMPARISON,
-            },
-            TokenType::GREATER_EQUAL => ParseRule {
-                prefix: None,
-                infix: Some(Compiler::binary),
-                precedence: Precedence::PREC_COMPARISON,
-            },
-            TokenType::LESS => ParseRule {
-                prefix: None,
-                infix: Some(Compiler::binary),
-                precedence: Precedence::PREC_COMPARISON,
-            },
-            TokenType::LESS_EQUAL => ParseRule {
-                prefix: None,
-                infix: Some(Compiler::binary),
-                precedence: Precedence::PREC_COMPARISON,
-            },
-            TokenType::PLUS_EQUAL => ParseRule {
-                prefix: None,
-                infix: None,
-                precedence: Precedence::PREC_ASSIGNMENT,
-            },
-            TokenType::MINUS_EQUAL => ParseRule {
-                prefix: None,
-                infix: None,
-                precedence: Precedence::PREC_ASSIGNMENT,
-            },
-            TokenType::STAR_EQUAL => ParseRule {
-                prefix: None,
-                infix: None,
-                precedence: Precedence::PREC_ASSIGNMENT,
-            },
-            TokenType::SLASH_EQUAL => ParseRule {
-                prefix: None,
-                infix: None,
-                precedence: Precedence::PREC_ASSIGNMENT,
-            },
-            TokenType::Identifier => ParseRule {
-                prefix: Some(Compiler::variable),
-                infix: None,
-                precedence: Precedence::PREC_NONE,
-            },
-            TokenType::Number => ParseRule {
-                prefix: Some(Compiler::number),
-                infix: None,
-                precedence: Precedence::PREC_NONE,
-            },
-            TokenType::String => ParseRule {
-                prefix: Some(Compiler::string),
-                infix: None,
-                precedence: Precedence::PREC_NONE,
-            },
-            TokenType::True => ParseRule {
-                prefix: Some(Compiler::literal),
-                infix: None,
-                precedence: Precedence::PREC_NONE,
-            },
-            TokenType::False => ParseRule {
-                prefix: Some(Compiler::literal),
-                infix: None,
-                precedence: Precedence::PREC_NONE,
-            },
-            TokenType::AND => ParseRule {
-                prefix: None,
-                infix: None,
-                precedence: Precedence::PREC_AND,
-            },
-            TokenType::ELSE => ParseRule {
-                prefix: None,
-                infix: None,
-                precedence: Precedence::PREC_NONE,
-            },
-            TokenType::FN => ParseRule {
-                prefix: None,
-                infix: None,
-                precedence: Precedence::PREC_NONE,
-            },
-            TokenType::FOR => ParseRule {
-                prefix: None,
-                infix: None,
-                precedence: Precedence::PREC_NONE,
-            },
-            TokenType::IF => ParseRule {
-                prefix: None,
-                infix: None,
-                precedence: Precedence::PREC_NONE,
-            },
-            TokenType::NIL => ParseRule {
-                prefix: Some(Compiler::literal),
-                infix: None,
-                precedence: Precedence::PREC_NONE,
-            },
-            TokenType::OR => ParseRule {
-                prefix: None,
-                infix: None,
-                precedence: Precedence::PREC_OR,
-            },
-            TokenType::PRINT => ParseRule {
-                prefix: None,
-                infix: None,
-                precedence: Precedence::PREC_NONE,
-            },
-            TokenType::RETURN => ParseRule {
-                prefix: None,
-                infix: None,
-                precedence: Precedence::PREC_NONE,
-            },
-            TokenType::LET => ParseRule {
-                prefix: None,
-                infix: None,
-                precedence: Precedence::PREC_NONE,
-            },
-            TokenType::WHILE => ParseRule {
-                prefix: None,
-                infix: None,
-                precedence: Precedence::PREC_NONE,
-            },
-            TokenType::COMMENT => ParseRule {
-                prefix: None,
-                infix: None,
-                precedence: Precedence::PREC_NONE,
-            },
-            TokenType::EOF => ParseRule {
-                prefix: None,
-                infix: None,
-                precedence: Precedence::PREC_NONE,
-            },
-        }
-    }
-}
-
-pub(crate) struct Compiler<'src> {
+pub struct Compiler {
     chunk: Chunk,
-    pub tokens_vec: Vec<Token>,
-    // pub tokens : Vec<(Result<TokenType, LexingError>, std::ops::Range<usize>)>,
-    current_token: usize,
-
-    parser: Parser,
-    interner: &'src mut Interner,
+    interner: Interner,
 }
 
-impl<'src> Compiler<'src> {
-    pub fn new(source: String, interner: &mut Interner) -> Compiler {
-        let mut tokens = TokenType::lexer(&source);
-        // remove the lifetime from the tokens without use_ref
-        // let tokens = TokenType::lexer(&source).spanned().collect();
-
-        // convet tokens to Vec<TokenType>
-
-        let mut tokens_vec = Vec::new();
-        loop {
-            let token = match tokens.next() {
-                Some(Ok(token)) => token,
-                Some(Err(e)) => {
-                    println!("Error: {:?}", e);
-                    break;
-                }
-                None => break,
-            };
-
-            let value = match token {
-                TokenType::Number => {
-                    Some(ValueType::Number(tokens.slice().parse::<f32>().unwrap()))
-                }
-                TokenType::String => Some(ValueType::String(interner.intern(tokens.slice()))),
-                TokenType::True => Some(ValueType::Boolean(true)),
-                TokenType::False => Some(ValueType::Boolean(false)),
-                TokenType::NIL => Some(ValueType::Nil),
-                _ => None,
-            };
-
-            // skip comments
-            if token == TokenType::COMMENT {
-                continue;
-            }
-
-            tokens_vec.push(Token {
-                token_type: token,
-                lexeme: tokens.slice().to_string(),
-                literal: value,
-                span: tokens.span(),
-            });
-        }
-
-        println!("{:?}", tokens_vec);
-
-        Compiler {
+impl Compiler {
+    pub fn new() -> Self {
+        Self {
             chunk: Chunk::new(),
-            tokens_vec,
-            // tokens,
-            current_token: 0,
-            parser: Parser {
-                current: Token {
-                    token_type: TokenType::EOF,
-                    lexeme: "".to_string(),
-                    literal: None,
-                    span: 0..0,
-                },
-                previous: Token {
-                    token_type: TokenType::EOF,
-                    lexeme: "".to_string(),
-                    literal: None,
-                    span: 0..0,
-                },
-            },
-            interner,
+            interner: Interner::default(),
         }
     }
 
-    pub(crate) fn compile(&mut self) -> Result<Chunk, ()> {
-        // TODO : 17.2.1 - Handling syntax errors
+    pub fn compile(&mut self, ast: ASTNode) -> (Chunk, Interner) {
+        self.visit(ast);
 
-        self.advance();
+        // add return
+        self.chunk.write(VectorType::Code(OpCode::OpReturn));
 
-        while self.parser.current.token_type != TokenType::EOF {
-            self.declaration();
-        }
-
-        self.end_compiler();
-        Ok(self.chunk.clone())
+        return (self.chunk.clone(), self.interner.clone());
     }
 
-    fn advance(&mut self) {
-        self.parser.previous = self.parser.current.clone();
+    fn visit(&mut self, node: ASTNode) {
+        match node {
+            ASTNode::Number(n) => {
+                self.chunk.write(VectorType::Code(OpCode::OpConstant));
 
-        loop {
-            if self.current_token >= (self.tokens_vec.len()) {
-                self.parser.current = Token {
-                    token_type: TokenType::EOF,
-                    lexeme: "".to_string(),
-                    literal: None,
-                    span: 0..0,
-                };
-                return;
+                let constant = self.chunk.add_constant(ValueType::Number(n));
+                self.chunk.write(VectorType::Constant(constant));
             }
-
-            let token = self.tokens_vec[self.current_token].clone();
-            self.parser.current = token.clone();
-
-            self.current_token += 1;
-
-            if token.token_type != TokenType::COMMENT {
-                break;
+            ASTNode::Boolean(b) => {
+                if b {
+                    self.chunk.write(VectorType::Code(OpCode::OpTrue));
+                } else {
+                    self.chunk.write(VectorType::Code(OpCode::OpFalse));
+                }
             }
-        }
-    }
-
-    fn consume(&mut self, token_type: TokenType, message: &str) {
-        if self.parser.current.token_type == token_type {
-            self.advance();
-            return;
-        } else {
-            panic!("Error: {}", message);
-        }
-        // self.error_at_current(message);
-    }
-
-    fn matches(&mut self, token_type: TokenType) -> bool {
-        if self.parser.current.token_type == token_type {
-            self.advance();
-            return true;
-        }
-        false
-    }
-
-    fn emit_byte(&mut self, byte: usize) {
-        self.chunk.write(byte, self.parser.previous.span.start);
-    }
-
-    fn emit_bytes(&mut self, byte1: usize, byte2: usize) {
-        self.emit_byte(byte1);
-        self.emit_byte(byte2);
-    }
-
-    fn end_compiler(&mut self) {
-        self.emit_byte(usize::from(OpCode::OpReturn));
-
-        // debug
-        // self.disassemble("code");
-    }
-
-    fn number(&mut self, can_assign: bool) {
-        let value = match self.parser.previous.literal.clone() {
-            Some(value) => value,
-            _ => panic!("Error: Expected a number."),
-        };
-
-        self.emit_constant(value);
-    }
-
-    fn string(&mut self, can_assign: bool) {
-        let value = match self.parser.previous.literal.clone() {
-            Some(value) => value,
-            _ => panic!("Error: Expected a string."),
-        };
-
-        self.emit_constant(value);
-    }
-
-    fn variable(&mut self, can_assign: bool) {
-        self.named_variable(&self.parser.previous.clone(), can_assign);
-    }
-
-    fn named_variable(&mut self, name: &Token, can_assign: bool) {
-        let arg = self.identifier_constant(name);
-        // self.emit_bytes(usize::from(OpCode::OpGetGlobal), arg);
-
-        if can_assign && self.matches(TokenType::EQUAL) {
-            self.expression();
-        } else {
-            self.emit_bytes(usize::from(OpCode::OpGetGlobal), arg);
-        }
-    }
-
-    fn expression(&mut self) {
-        self.parse_precedence(Precedence::PREC_ASSIGNMENT);
-    }
-
-    fn let_declaration(&mut self) {
-        let global = self.parse_variable("Expect variable name.");
-
-        self.consume(TokenType::EQUAL, "Expect '=' after variable name.");
-
-        self.expression();
-
-        self.consume(TokenType::SEMICOLON, "Expect ';' after value.");
-
-        self.emit_bytes(usize::from(OpCode::OpDefineGlobal), global);
-    }
-
-    fn expression_statement(&mut self) {
-        self.expression();
-        self.consume(TokenType::SEMICOLON, "Expect ';' after expression.");
-        self.emit_byte(usize::from(OpCode::OpPop));
-    }
-
-    fn print_statement(&mut self) {
-        self.consume(TokenType::LEFT_PAREN, "Expect '(' after 'print'.");
-        self.expression();
-        self.consume(TokenType::RIGHT_PAREN, "Expect ')' after value.");
-        self.consume(TokenType::SEMICOLON, "Expect ';' after value.");
-        self.emit_byte(usize::from(OpCode::OpPrint));
-    }
-
-    // TODO: ch21 - synchronize
-
-    fn declaration(&mut self) {
-        if self.matches(TokenType::LET) {
-            self.let_declaration();
-        } else {
-            self.statement();
-        }
-    }
-
-    fn statement(&mut self) {
-        if self.matches(TokenType::PRINT) {
-            self.print_statement();
-        } else {
-            self.expression_statement();
-        }
-    }
-
-    fn emit_constant(&mut self, value: ValueType) {
-        let constant = self.chunk.add_constant(value);
-        self.emit_bytes(usize::from(OpCode::OpConstant), constant);
-    }
-
-    fn grouping(&mut self, can_assign: bool) {
-        self.expression();
-        self.consume(TokenType::RIGHT_PAREN, "Expect ')' after expression.");
-    }
-
-    fn unary(&mut self, can_assign: bool) {
-        let operator_type = self.parser.previous.token_type;
-
-        self.parse_precedence(Precedence::PREC_UNARY);
-
-        match operator_type {
-            TokenType::BANG => self.emit_byte(usize::from(OpCode::OpNot)),
-            TokenType::MINUS => self.emit_byte(usize::from(OpCode::OpNegate)),
-            _ => {}
-        }
-    }
-
-    fn parse_precedence(&mut self, precedence: Precedence) {
-        self.advance();
-        let prefix_rule = ParseRule::get_rule(self.parser.previous.token_type).prefix;
-
-        if prefix_rule.is_none() {
-            // self.error("Expect expression.");
-            println!("Expect expression.");
-            return;
-        }
-
-        let can_assign = precedence as i32 <= Precedence::PREC_ASSIGNMENT as i32;
-        match prefix_rule {
-            Some(rule) => rule(self, can_assign),
-            None => {}
-        }
-
-        while precedence as i32
-            <= ParseRule::get_rule(self.parser.current.token_type).precedence as i32
-        {
-            self.advance();
-            let infix_rule = ParseRule::get_rule(self.parser.previous.token_type).infix;
-
-            match infix_rule {
-                Some(rule) => rule(self, can_assign),
-                None => {}
+            ASTNode::String(s) => {
+                self.chunk.write(VectorType::Code(OpCode::OpConstant));
+                let constant = self
+                    .chunk
+                    .add_constant(ValueType::String(self.interner.intern_string(s)));
+                self.chunk.write(VectorType::Constant(constant));
             }
+            ASTNode::Op(op, vec) => {
+                for node in vec {
+                    self.visit(node);
+                }
 
-            if can_assign && self.matches(TokenType::EQUAL) {
-                // self.error("Invalid assignment target.");
-                println!("Invalid assignment target.");
+                match op {
+                    Ops::BinaryOp(BinaryOp::Add) => {
+                        self.chunk.write(VectorType::Code(OpCode::OpAdd))
+                    }
+                    Ops::BinaryOp(BinaryOp::Sub) => {
+                        self.chunk.write(VectorType::Code(OpCode::OpSubtract))
+                    }
+                    Ops::BinaryOp(BinaryOp::Mul) => {
+                        self.chunk.write(VectorType::Code(OpCode::OpMultiply))
+                    }
+                    Ops::BinaryOp(BinaryOp::Div) => {
+                        self.chunk.write(VectorType::Code(OpCode::OpDivide))
+                    }
+                    Ops::BinaryOp(BinaryOp::Eq) => {
+                        self.chunk.write(VectorType::Code(OpCode::OpEqualEqual))
+                    }
+                    Ops::BinaryOp(BinaryOp::Ne) => {
+                        self.chunk.write(VectorType::Code(OpCode::OpEqualEqual));
+                        self.chunk.write(VectorType::Code(OpCode::OpNot))
+                    }
+                    Ops::BinaryOp(BinaryOp::Lt) => {
+                        self.chunk.write(VectorType::Code(OpCode::OpLess))
+                    }
+                    Ops::BinaryOp(BinaryOp::Le) => {
+                        self.chunk.write(VectorType::Code(OpCode::OpGreater));
+                        self.chunk.write(VectorType::Code(OpCode::OpNot))
+                    }
+                    Ops::BinaryOp(BinaryOp::Gt) => {
+                        self.chunk.write(VectorType::Code(OpCode::OpGreater))
+                    }
+                    Ops::BinaryOp(BinaryOp::Ge) => {
+                        self.chunk.write(VectorType::Code(OpCode::OpLess));
+                        self.chunk.write(VectorType::Code(OpCode::OpNot))
+                    }
+
+                    _ => println!("Invalid operator"), // TODO: handle this error
+                }
             }
-        }
-    }
-
-    fn parse_variable(&mut self, error_message: &str) -> usize {
-        self.consume(TokenType::Identifier, error_message);
-
-        self.identifier_constant(&self.parser.previous.clone())
-    }
-
-    fn identifier_constant(&mut self, name: &Token) -> usize {
-        self.chunk
-            .add_constant(ValueType::Identifier(self.interner.intern(&name.lexeme)))
-    }
-
-    fn binary(&mut self, can_assign: bool) {
-        let operator_type = self.parser.previous.token_type;
-
-        let rule = ParseRule::get_rule(operator_type);
-
-        self.parse_precedence(rule.precedence as Precedence);
-
-        match operator_type {
-            TokenType::PLUS => self.emit_byte(usize::from(OpCode::OpAdd)),
-            TokenType::MINUS => self.emit_byte(usize::from(OpCode::OpSubtract)),
-            TokenType::STAR => self.emit_byte(usize::from(OpCode::OpMultiply)),
-            TokenType::SLASH => self.emit_byte(usize::from(OpCode::OpDivide)),
-            TokenType::HAT => self.emit_byte(usize::from(OpCode::OpPower)),
-            TokenType::BANG_EQUAL => {
-                self.emit_bytes(usize::from(OpCode::OpEqual), usize::from(OpCode::OpNot))
-            }
-            TokenType::EQUAL_EQUAL => self.emit_byte(usize::from(OpCode::OpEqual)),
-            TokenType::GREATER => self.emit_byte(usize::from(OpCode::OpGreater)),
-            TokenType::GREATER_EQUAL => {
-                self.emit_bytes(usize::from(OpCode::OpLess), usize::from(OpCode::OpNot))
-            }
-            TokenType::LESS => self.emit_byte(usize::from(OpCode::OpLess)),
-            TokenType::LESS_EQUAL => {
-                self.emit_bytes(usize::from(OpCode::OpGreater), usize::from(OpCode::OpNot))
-            }
-            _ => {}
-        }
-    }
-
-    fn literal(&mut self, can_assign: bool) {
-        match self.parser.previous.token_type {
-            TokenType::True => self.emit_byte(usize::from(OpCode::OpTrue)),
-            TokenType::False => self.emit_byte(usize::from(OpCode::OpFalse)),
-            TokenType::NIL => self.emit_byte(usize::from(OpCode::OpNil)),
-            _ => {
-                panic!("Error: Expected a literal.");
-            }
+            _ => println!("Invalid ASTNode"), // TODO: handle this error
         }
     }
 }

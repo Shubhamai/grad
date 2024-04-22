@@ -4,7 +4,7 @@
 use std::collections::HashMap;
 
 pub type StringObjIdx = u32;
-#[derive(Default)]
+#[derive(Default, Debug, Clone)]
 pub struct Interner {
     pub map: HashMap<String, u32>,
     vec: Vec<String>,

@@ -1,22 +1,15 @@
-// pub enum ValueType {
-//     Number(f64), // TODO: Ideally, it should be seperate types for int and float (maybe?)
-//     // String(String),
-//     // Boolean(bool),
-//     // Nil,
-//     // Lists, Dicts, Tensors, etc.
-// }
-
 use crate::interner::StringObjIdx;
 
 #[derive(Debug, Clone, Copy)]
 pub enum ValueType {
-    Number(f32), // TODO: Ideally, it should be seperate types for int and float (maybe?)
+    Number(f64), // TODO: Ideally, it should be seperate types for int and float (maybe?)
     String(StringObjIdx),
     Identifier(StringObjIdx),
     Boolean(bool),
     Nil,
     // Lists, Dicts, Tensors, etc.
 }
+
 
 impl std::fmt::Display for ValueType {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
@@ -116,24 +109,5 @@ impl std::cmp::PartialOrd for ValueType {
             (ValueType::Number(a), ValueType::Number(b)) => a.partial_cmp(b),
             _ => None,
         }
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct ValueArray {
-    pub values: Vec<ValueType>,
-}
-
-impl ValueArray {
-    pub(crate) fn new() -> Self {
-        Self { values: Vec::new() }
-    }
-
-    pub(crate) fn write(&mut self, value: ValueType) {
-        self.values.push(value);
-    }
-
-    pub(crate) fn free(&mut self) {
-        self.values.clear();
     }
 }

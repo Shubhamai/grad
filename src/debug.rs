@@ -1,124 +1,74 @@
-use crate::{chunk::{self, OpCode}, vm::VM};
+use crate::chunk;
 
-// impl disassemble chunk trait for  chunk class
-
-pub trait Disassemble {
-    fn disassemble_instruction(&self, offset: usize) -> usize;
-    fn disassemble(&self, name: &str);
+pub struct Debug {
+    name: String,
+    chunk: chunk::Chunk,
 }
 
-impl Disassemble for VM {
-    fn disassemble(&self, name: &str) {
+impl Debug {
+    pub fn new(name: &str, chunk: chunk::Chunk) -> Self {
+        Self {
+            name: name.to_string(),
+            chunk,
+        }
+    }
+
+    pub fn disassemble(&self) {
+        println!("======== {} ========", self.name);
 
         let mut offset = 0;
         while offset < self.chunk.code.len() {
             offset = self.disassemble_instruction(offset);
         }
+
+        println!("====================");
     }
 
     fn disassemble_instruction(&self, offset: usize) -> usize {
-        print!("{:04} ", offset);
-
-        let instruction = OpCode::from(self.chunk.code[offset]);
+        let instruction = self.chunk.code[offset];
 
         match instruction {
-            chunk::OpCode::OpReturn => {
-                println!("{}", instruction);
-                return offset + 1;
-            }
-            chunk::OpCode::OpNegate => {
-                println!("{}", instruction);
-                return offset + 1;
-            }
-            chunk::OpCode::OpAdd => {
-                println!("{}", instruction);
-                return offset + 1;
-            }
-            chunk::OpCode::OpSubtract => {
-                println!("{}", instruction);
-                return offset + 1;
-            }
-            chunk::OpCode::OpMultiply => {
-                println!("{}", instruction);
-                return offset + 1;
-            }
-            chunk::OpCode::OpDivide => {
-                println!("{}", instruction);
-                return offset + 1;
-            }
-            chunk::OpCode::OpPower => {
-                println!("{}", instruction);
-                return offset + 1;
-            }
-            chunk::OpCode::OpConstant => {
-                let constant = self.chunk.code[offset + 1];
-                println!(
-                    "{} {:04} | {}",
-                    instruction, constant, self.chunk.constants.values[constant as usize]
-                );
-                return offset + 2;
-            }
-            chunk::OpCode::OpNil => {
-                println!("{}", instruction);
-                return offset + 1;
-            }
-            chunk::OpCode::OpTrue => {
-                println!("{}", instruction);
-                return offset + 1;
-            }
-            chunk::OpCode::OpFalse => {
-                println!("{}", instruction);
-                return offset + 1;
-            }
-            chunk::OpCode::OpNot => {
-                println!("{}", instruction);
-                return offset + 1;
-            }
-            chunk::OpCode::OpEqual => {
-                println!("{}", instruction);
-                return offset + 1;
-            }
-            chunk::OpCode::OpGreater => {
-                println!("{}", instruction);
-                return offset + 1;
-            }
-            chunk::OpCode::OpLess => {
-                println!("{}", instruction);
-                return offset + 1;
-            }
-            chunk::OpCode::OpPrint => {
-                println!("{}", instruction);
-                return offset + 1;
-            }
-            chunk::OpCode::OpPop => {
-                println!("{}", instruction);
-                return offset + 1;
-            }
-            chunk::OpCode::OpDefineGlobal => {
-                let constant = self.chunk.code[offset + 1];
-                println!(
-                    "{} {:04} | {}",
-                    instruction, constant, self.chunk.constants.values[constant as usize]
-                );
-                return offset + 2;
-            }
-            chunk::OpCode::OpGetGlobal => {
-                let constant = self.chunk.code[offset + 1];
-                println!(
-                    "{} {:04} | {}",
-                    instruction, constant, self.chunk.constants.values[constant as usize]
-                );
-                return offset + 2;
-            }
-            chunk::OpCode::OpSetGlobal => {
-                let constant = self.chunk.code[offset + 1];
-                println!(
-                    "{} {:04} | {}",
-                    instruction, constant, self.chunk.constants.values[constant as usize]
-                );
-                return offset + 2;
-            }
+            chunk::VectorType::Code(chunk::OpCode::OpReturn)
+            | chunk::VectorType::Code(chunk::OpCode::OpNegate)
+            | chunk::VectorType::Code(chunk::OpCode::OpAdd)
+            | chunk::VectorType::Code(chunk::OpCode::OpSubtract)
+            | chunk::VectorType::Code(chunk::OpCode::OpMultiply)
+            | chunk::VectorType::Code(chunk::OpCode::OpDivide)
+            | chunk::VectorType::Code(chunk::OpCode::OpPower)
+            | chunk::VectorType::Code(chunk::OpCode::OpNil)
+            | chunk::VectorType::Code(chunk::OpCode::OpTrue)
+            | chunk::VectorType::Code(chunk::OpCode::OpFalse)
+            | chunk::VectorType::Code(chunk::OpCode::OpNot)
+            | chunk::VectorType::Code(chunk::OpCode::OpEqualEqual)
+            | chunk::VectorType::Code(chunk::OpCode::OpGreater)
+            | chunk::VectorType::Code(chunk::OpCode::OpLess)
+            | chunk::VectorType::Code(chunk::OpCode::OpPrint)
+            | chunk::VectorType::Code(chunk::OpCode::OpPop) => {
+                println!("{:04} {}", offset, instruction);
 
+                return offset + 1;
+            }
+            chunk::VectorType::Code(
+                chunk::OpCode::OpConstant
+                | chunk::OpCode::OpDefineGlobal
+                | chunk::OpCode::OpGetGlobal
+                | chunk::OpCode::OpSetGlobal,
+            ) => {
+                let constant = self.chunk.code[offset + 1];
+                match constant {
+                    chunk::VectorType::Constant(idx) => {
+                        println!(
+                            "{:04} {} {:04} | {}",
+                            offset, instruction, constant, self.chunk.constants[idx]
+                        );
+                    }
+                    _ => unreachable!(),
+                }
+                return offset + 2;
+            }
+            chunk::VectorType::Constant(_) => {
+                return offset;
+            }
         }
     }
 }
