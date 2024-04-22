@@ -1,7 +1,22 @@
-let a = -4.0;
-let b = 2.0;
-let c = a + b;
-let d = a * b + b^3;
-// c += c + 1;
-// c += 1 + c + (-a);
-print(d);
+// x[0+2][1]
+
+// x.relu(a.b(0+2), 2-1).max(0)/2
+// x.relu(0, 1, "sdfsd", false)
+x.f(1 > 2, 3 != 3)
+
+// f@g
+
+// 1 or 2
+
+
+
+// print(a);
+// print(a <= 4);
+
+// let breakfast = "beignets";
+//let beverage = "cafe au lait";
+//breakfast = "beignets with " + beverage;
+//print(breakfast);
+
+// Ops(PostfixOp(Call), [Identifier("x"), Ops(PostfixOp(Args), [Ops(PostfixOp(Call), [Identifier("a"), Ops(PostfixOp(Args), [Number(0.0)])]), Number(2.0)])])
+// Op(PostfixOp(Call), [Identifier("x"), Callee("f", [Op(BinaryOp(Gt), [Number(1.0), Number(2.0)])])])

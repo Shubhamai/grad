@@ -4,6 +4,10 @@
 // built-in support of einops, and common layers (relu, attention, linear...)
 // with syntax highlighting, online playground, ide integration, repl
 
+// ast optimizer using gpt/llama perhaps ? ( experiment )
+Q: optimize this ast and only return the answer and nothing else `(. x (f (> 1 2) (!= 3 3)))`
+AI: (. x (f false false))
+
 let a = -4.0;
 let b = 2.0;
 let c = a + b;

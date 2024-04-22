@@ -1,11 +1,13 @@
 mod chunk;
-mod compiler;
-mod debug;
+// mod compiler;
+// mod debug;
 mod scanner;
 mod value;
-mod vm;
+// mod vm;
 mod interner;
+mod ast;
 
+use ast::expr;
 use clap::Parser as ClapParser;
 use std::io::Write;
 
@@ -38,48 +40,40 @@ fn main() {
 }
 
 fn run_repl() {
-    // let chunk = chunk::Chunk::new();
-    // let mut vm = vm::VM::init(chunk);
-    let mut vm = vm::VM::init();
+    // let mut vm = vm::VM::init();
 
-    loop {
-        // print prompt
-        print!("> ");
-        let _ = std::io::stdout().flush();
+    // loop {
+    //     // print prompt
+    //     print!("> ");
+    //     let _ = std::io::stdout().flush();
 
-        // read input
-        let mut input = String::new();
-        input = match std::io::stdin().read_line(&mut input) {
-            Ok(_) => input,
-            Err(e) => panic!("Error reading input: {}", e),
-        };
+    //     // read input
+    //     let mut input = String::new();
+    //     input = match std::io::stdin().read_line(&mut input) {
+    //         Ok(_) => input,
+    //         Err(e) => panic!("Error reading input: {}", e),
+    //     };
 
-        // exit if input is "exit"
-        if input.trim() == "exit" || input.trim() == "" {
-            break;
-        }
+    //     // exit if input is "exit"
+    //     if input.trim() == "exit" || input.trim() == "" {
+    //         break;
+    //     }
 
-        // run source
-        vm.interpret(&input);
-    }
+    //     // run source
+    //     vm.interpret(&input);
+    // }
 }
 
 fn run_source(src: &str) {
-    // let chunk = chunk::Chunk::new();
-    // let mut vm = vm::VM::init(chunk);
-    let mut vm = vm::VM::init();
 
-    let result = vm.interpret(src);
+    // let mut lexer = Lexer::new(source.to_string());
+    let out = expr(src);
+    println!("{}", out);
+    println!("{:?}", out);
 
-    // match result {
-    //     vm::InterpretResult::INTERPRET_COMPILE_ERROR => {
-    //         println!("Compile error");
-    //     }
-    //     vm::InterpretResult::INTERPRET_RUNTIME_ERROR => {
-    //         println!("Runtime error");
-    //     }
-    //     vm::InterpretResult::INTERPRET_OK => {
-    //         println!("Interpret ok");
-    //     }
-    // }
+    // let mut vm = vm::VM::init();
+    // let result = vm.interpret(src);
+
+ 
+ 
 }
