@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use crate::{
     chunk::{self, Chunk, VectorType},
+    debug,
     interner::{Interner, StringObjIdx},
     value::ValueType,
 };
@@ -24,9 +25,9 @@ pub(crate) struct VM {
     globals: HashMap<StringObjIdx, ValueType>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum InterpretResult {
-    InterpretOk,
+    InterpretOk(Vec<ValueType>),
     InterpretCompileError,
     InterpretRuntimeError,
 }
@@ -45,19 +46,22 @@ impl VM {
     }
 
     pub fn run(&mut self) -> InterpretResult {
+        let mut print_outputs = Vec::new();
+
         loop {
             // debug
             // for i in 0..self.stack_top {
             //     print!("{} ", self.stack[i]);
             // }
-            // self.chunk.disassemble_instruction(self.ip);
+            // let debug = debug::Debug::new(&format!("{}", self.ip), self.chunk.clone());
+            // debug.disassemble_instruction(self.ip);
 
             let instruction = self.read_byte();
 
             match instruction {
                 chunk::VectorType::Code(chunk::OpCode::OpReturn) => {
                     // println!("{}", self.pop());
-                    return InterpretResult::InterpretOk;
+                    return InterpretResult::InterpretOk(print_outputs);
                 }
                 chunk::VectorType::Code(chunk::OpCode::OpAdd) => {
                     if let ValueType::String(_) = self.peek(0) {
@@ -100,20 +104,6 @@ impl VM {
                     let value = self.pop();
                     self.push(-value);
                 }
-                chunk::VectorType::Code(chunk::OpCode::OpConstant) => {
-                    let index = self.read_byte();
-                    // let constant = self.read_constant(index);
-                    match index {
-                        chunk::VectorType::Constant(idx) => {
-                            let constant = self.read_constant(idx as usize);
-                            self.push(constant);
-                        }
-                        _ => {
-                            println!("Invalid constant index");
-                            return InterpretResult::InterpretRuntimeError;
-                        }
-                    }
-                }
                 chunk::VectorType::Code(chunk::OpCode::OpNil) => {
                     self.push(ValueType::Nil);
                 }
@@ -143,17 +133,33 @@ impl VM {
                     self.push(ValueType::Boolean(a < b));
                 }
                 chunk::VectorType::Code(chunk::OpCode::OpPrint) => {
-                    println!("{}", self.pop());
+                    let value = self.pop();
+                    print_outputs.push(value);
+                    println!("{}", value);
                 }
                 chunk::VectorType::Code(chunk::OpCode::OpPop) => {
                     self.pop();
+                }
+                chunk::VectorType::Code(chunk::OpCode::OpConstant) => {
+                    let index = self.read_byte();
+
+                    match index {
+                        chunk::VectorType::Constant(idx) => {
+                            let constant = self.read_constant(idx as usize);
+                            self.push(constant);
+                        }
+                        _ => {
+                            println!("op constant: Invalid constant index : {:?}", index);
+                            return InterpretResult::InterpretRuntimeError;
+                        }
+                    }
                 }
                 chunk::VectorType::Code(chunk::OpCode::OpDefineGlobal) => {
                     let index = self.read_byte();
                     let constant = match index {
                         chunk::VectorType::Constant(idx) => self.read_constant(idx as usize),
                         _ => {
-                            println!("Invalid constant index");
+                            println!("define global: Invalid constant index : {:?}", index);
                             return InterpretResult::InterpretRuntimeError;
                         }
                     };
@@ -171,7 +177,7 @@ impl VM {
                     let constant = match index {
                         chunk::VectorType::Constant(idx) => self.read_constant(idx as usize),
                         _ => {
-                            println!("Invalid constant index");
+                            println!("get global: Invalid constant index : {:?}", index);
                             return InterpretResult::InterpretRuntimeError;
                         }
                     };
@@ -199,7 +205,7 @@ impl VM {
                     let constant = match index {
                         chunk::VectorType::Constant(idx) => self.read_constant(idx as usize),
                         _ => {
-                            println!("Invalid constant index");
+                            println!("set global: Invalid constant index : {:?}", index);
                             return InterpretResult::InterpretRuntimeError;
                         }
                     };
@@ -216,7 +222,10 @@ impl VM {
                         }
                     }
                 }
-                VectorType::Constant(_) => todo!(),
+                VectorType::Constant(const_idx) => {
+                    // println!("Constant: {:?}", const_idx);
+                    // self.push(self.chunk.constants[const_idx]);
+                }
             }
         }
     }

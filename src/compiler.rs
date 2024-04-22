@@ -1,5 +1,5 @@
 use crate::{
-    ast::{ASTNode, BinaryOp, Ops},
+    ast::{ASTNode, BinaryOp, Ops, PostfixOp, UnaryOp},
     chunk::{Chunk, OpCode, VectorType},
     interner::Interner,
     value::ValueType,
@@ -18,8 +18,9 @@ impl Compiler {
         }
     }
 
-    pub fn compile(&mut self, ast: ASTNode) -> (Chunk, Interner) {
-        self.visit(ast);
+    pub fn compile(&mut self, ast: Vec<ASTNode>) -> (Chunk, Interner) {
+        // NOTE: stmts or exprs or whatever
+        ast.iter().for_each(|stmt| self.visit(stmt.clone()));
 
         // add return
         self.chunk.write(VectorType::Code(OpCode::OpReturn));
@@ -48,6 +49,14 @@ impl Compiler {
                     .chunk
                     .add_constant(ValueType::String(self.interner.intern_string(s)));
                 self.chunk.write(VectorType::Constant(constant));
+            }
+            ASTNode::Identifier(iden) => {
+                self.chunk.write(VectorType::Code(OpCode::OpGetGlobal));
+
+                let global = self
+                    .chunk
+                    .add_constant(ValueType::Identifier(self.interner.intern_string(iden)));
+                self.chunk.write(VectorType::Constant(global));
             }
             ASTNode::Op(op, vec) => {
                 for node in vec {
@@ -89,8 +98,46 @@ impl Compiler {
                         self.chunk.write(VectorType::Code(OpCode::OpNot))
                     }
 
+                    Ops::UnaryOp(UnaryOp::Negate) => {
+                        self.chunk.write(VectorType::Code(OpCode::OpNegate))
+                    }
+
+                    Ops::PostfixOp(PostfixOp::STAR_STAR) => {
+                        self.chunk.write(VectorType::Code(OpCode::OpPower))
+                    }
                     _ => println!("Invalid operator"), // TODO: handle this error
                 }
+            }
+            ASTNode::Print(expr) => {
+                assert!(expr.len() == 1);
+                self.visit(expr[0].clone());
+                self.chunk.write(VectorType::Code(OpCode::OpPrint));
+            }
+            ASTNode::Let(iden, expr) => {
+                assert!(expr.len() == 1);
+
+                let global = self
+                    .chunk
+                    .add_constant(ValueType::Identifier(self.interner.intern_string(iden)));
+                // self.chunk.write(VectorType::Constant(global));
+
+                self.visit(expr[0].clone());
+
+                self.chunk.write(VectorType::Code(OpCode::OpDefineGlobal));
+                self.chunk.write(VectorType::Constant(global));
+            }
+            ASTNode::Assign(iden, expr) => {
+                assert!(expr.len() == 1);
+
+                let global = self
+                    .chunk
+                    .add_constant(ValueType::Identifier(self.interner.intern_string(iden)));
+                // self.chunk.write(VectorType::Constant(global));
+
+                self.visit(expr[0].clone());
+
+                self.chunk.write(VectorType::Code(OpCode::OpSetGlobal));
+                self.chunk.write(VectorType::Constant(global));
             }
             _ => println!("Invalid ASTNode"), // TODO: handle this error
         }

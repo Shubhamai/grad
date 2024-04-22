@@ -60,7 +60,7 @@ pub enum VectorType {
 impl std::fmt::Display for VectorType {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            VectorType::Constant(c) => write!(f, "index->[{}]", c),
+            VectorType::Constant(c) => write!(f, "cons->[{}]", c),
             VectorType::Code(op) => write!(f, "{}", op),
         }
     }

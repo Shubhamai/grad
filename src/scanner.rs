@@ -55,7 +55,10 @@ pub enum TokenType {
     STAR,
 
     #[token("@")]
-    AT, // @
+    AT, // dot product
+
+    #[token("**")]
+    STAR_STAR, //  exponentiation
 
     // One or two character tokens.
     #[token("!")]
@@ -231,6 +234,15 @@ impl Lexer {
                 span: 0..0,
             })
             .clone()
+    }
+
+    pub fn peek_n_type(&self, n: usize) -> Vec<TokenType> {
+        let mut tokens = self.tokens.clone();
+        tokens.reverse();
+        tokens.truncate(n);
+        // tokens.reverse();
+        
+        tokens.iter().map(|t| t.token_type).collect()
     }
 }
 

@@ -14,10 +14,10 @@ pub enum ValueType {
 impl std::fmt::Display for ValueType {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            ValueType::Number(n) => write!(f, "{}", n),
-            ValueType::String(s) => write!(f, "{}", s),
-            ValueType::Identifier(s) => write!(f, "{}", s),
-            ValueType::Boolean(b) => write!(f, "{}", b),
+            ValueType::Number(n) => write!(f, "num->{}", n),
+            ValueType::String(s) => write!(f, "str->{}", s),
+            ValueType::Identifier(s) => write!(f, "iden->{}", s),
+            ValueType::Boolean(b) => write!(f, "bool->{}", b),
             ValueType::Nil => write!(f, "nil"),
         }
     }

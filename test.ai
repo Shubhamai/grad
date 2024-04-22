@@ -5,6 +5,13 @@
 // x.f(1 > 2, 3 != 3)
 
 
+let a = -4.0;
+let b = 2.0;
+let c = a + b;
+let d = a * b + b**3;
+c += c + 1;
+c += 1 + c + (-a);
+print(c == -1);
 
 // f@g
 

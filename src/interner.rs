@@ -3,10 +3,10 @@
 
 use std::collections::HashMap;
 
-pub type StringObjIdx = u32;
+pub type StringObjIdx = usize;
 #[derive(Default, Debug, Clone)]
 pub struct Interner {
-    pub map: HashMap<String, u32>,
+    pub map: HashMap<String, usize>,
     vec: Vec<String>,
 }
 
@@ -23,7 +23,7 @@ impl Interner {
     }
 
     pub fn intern_string(&mut self, name: String) -> StringObjIdx {
-        if let Some(&idx) = self.map.get(&name) {
+        if let Some(&idx ) = self.map.get(&name) {
             return idx;
         }
         let idx = self.map.len() as StringObjIdx;

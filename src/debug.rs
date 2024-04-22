@@ -24,7 +24,7 @@ impl Debug {
         println!("====================");
     }
 
-    fn disassemble_instruction(&self, offset: usize) -> usize {
+    pub fn disassemble_instruction(&self, offset: usize) -> usize {
         let instruction = self.chunk.code[offset];
 
         match instruction {
@@ -62,12 +62,14 @@ impl Debug {
                             offset, instruction, constant, self.chunk.constants[idx]
                         );
                     }
-                    _ => unreachable!(),
+                    _ => {
+                        println!("{:04} {} {:04}", offset, instruction, constant);
+                    }
                 }
                 return offset + 2;
             }
             chunk::VectorType::Constant(_) => {
-                return offset;
+                return offset +1;
             }
         }
     }

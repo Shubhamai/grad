@@ -9,8 +9,9 @@ mod vm;
 
 use clap::Parser as ClapParser;
 use std::io::Write;
+use vm::InterpretResult;
 
-use crate::{ast::expr_bp, scanner::Lexer};
+use crate::{ast::Parser, scanner::Lexer};
 
 #[derive(ClapParser, Debug)]
 #[command(version, about, long_about = None)]
@@ -61,8 +62,7 @@ fn run_repl() {
         // ======================== REPL ========================
         let mut lexer = Lexer::new(input.to_string());
 
-        let out = expr_bp(&mut lexer, 0);
-        println!("{}", out);
+        let out = Parser::new(&mut lexer).parse();
         println!("{:?}", out);
 
         let mut compiler = compiler::Compiler::new();
@@ -73,21 +73,56 @@ fn run_repl() {
         let debug = debug::Debug::new("test", bytecode.clone());
         debug.disassemble();
 
-        // ======================== REPL ========================
-
         let mut vm = vm::VM::init(bytecode, interner);
         let result = vm.run();
-        println!("{:?}", result);
+        // println!("{:?}", result);
+
+        // ======================== REPL ========================
     }
 }
 
-fn run_source(src: &str) {
+pub fn run_source(src: &str) -> InterpretResult {
     let mut lexer = Lexer::new(src.to_string());
 
-    let out = expr_bp(&mut lexer, 0);
-    println!("{}", out);
+    let out = Parser::new(&mut lexer).parse();
     println!("{:?}", out);
 
-    // let mut vm = vm::VM::init();
-    // let result = vm.interpret(src);
+    let mut compiler = compiler::Compiler::new();
+    let (bytecode, interner) = compiler.compile(out);
+    println!("{:?}", bytecode);
+
+    let debug = debug::Debug::new("test", bytecode.clone());
+    debug.disassemble();
+
+    let mut vm = vm::VM::init(bytecode, interner);
+    let result = vm.run();
+
+    println!("{:?}", result);
+
+    return result;
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{run_source, value::ValueType, vm::InterpretResult};
+
+    #[test]
+    fn test_micrograd_example() {
+        let src = r#"
+                        let a = -4.0;
+                        let b = 2.0;
+                        let c = a + b;
+                        let d = a * b + b**3;
+                        c += c + 1;
+                        c += 1 + c + (-a);
+                        print(c == -1);
+                        "#;
+
+        let out = run_source(&src);
+
+        assert_eq!(
+            out,
+            InterpretResult::InterpretOk(vec![ValueType::Boolean(true)])
+        );
+    }
 }

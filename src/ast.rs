@@ -11,6 +11,85 @@ pub enum ASTNode {
     String(String),
     Op(Ops, Vec<ASTNode>),
     Callee(String, Vec<ASTNode>), // function call with arguments
+    Let(String, Vec<ASTNode>),
+    Assign(String, Vec<ASTNode>),
+    Print(Vec<ASTNode>),
+}
+
+pub struct Parser<'a> {
+    lexer: &'a mut Lexer,
+}
+
+impl<'a> Parser<'a> {
+    pub fn new(lexer: &mut Lexer) -> Parser {
+        Parser { lexer }
+    }
+
+    pub fn parse(&mut self) -> Vec<ASTNode> {
+        let mut statements = vec![];
+
+        while self.lexer.peek().token_type != TokenType::EOF {
+            // print statement; print(1);
+            if self.lexer.peek().token_type == TokenType::PRINT {
+                self.lexer.next();
+                assert_eq!(self.lexer.next().token_type, TokenType::LEFT_PAREN);
+                let expr = expr_bp(self.lexer, 0);
+                assert_eq!(self.lexer.next().token_type, TokenType::RIGHT_PAREN);
+
+                statements.push(ASTNode::Print(vec![expr]));
+            }
+            // let declaration; let a= 3;
+            else if self.lexer.peek().token_type == TokenType::LET {
+                self.lexer.next();
+                let identifier = self.lexer.next().lexeme;
+                assert_eq!(self.lexer.next().token_type, TokenType::EQUAL);
+                let expr = expr_bp(self.lexer, 0);
+                statements.push(ASTNode::Let(identifier, vec![expr]));
+            }
+            // assignment; a = 3, a+=3, a-=4, a*=5, a/=6
+            else if self.lexer.peek_n_type(2)
+                == Vec::from([TokenType::Identifier, TokenType::EQUAL])
+                || self.lexer.peek_n_type(2)
+                    == Vec::from([TokenType::Identifier, TokenType::PLUS_EQUAL])
+                || self.lexer.peek_n_type(2)
+                    == Vec::from([TokenType::Identifier, TokenType::MINUS_EQUAL])
+                || self.lexer.peek_n_type(2)
+                    == Vec::from([TokenType::Identifier, TokenType::STAR_EQUAL])
+                || self.lexer.peek_n_type(2)
+                    == Vec::from([TokenType::Identifier, TokenType::SLASH_EQUAL])
+            {
+                let identifier = self.lexer.next().lexeme;
+                let op = self.lexer.next().token_type;
+
+                let expr = if op == TokenType::EQUAL {
+                    expr_bp(self.lexer, 0)
+                } else {
+                    let expr = expr_bp(self.lexer, 0);
+                    let op = match op {
+                        TokenType::PLUS_EQUAL => Ops::BinaryOp(BinaryOp::Add),
+                        TokenType::MINUS_EQUAL => Ops::BinaryOp(BinaryOp::Sub),
+                        TokenType::STAR_EQUAL => Ops::BinaryOp(BinaryOp::Mul),
+                        TokenType::SLASH_EQUAL => Ops::BinaryOp(BinaryOp::Div),
+                        _ => panic!("bad token: {:?}", op),
+                    };
+                    ASTNode::Op(op, vec![ASTNode::Identifier(identifier.clone()), expr])
+                };
+
+                statements.push(ASTNode::Assign(identifier, vec![expr]));
+            }
+            // expression
+            else {
+                let expr = expr_bp(self.lexer, 0);
+                statements.push(expr);
+            }
+
+            if self.lexer.peek().token_type == TokenType::SEMICOLON {
+                self.lexer.next();
+            }
+        }
+
+        statements
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -32,6 +111,7 @@ pub enum BinaryOp {
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum UnaryOp {
+    Negate, 
     Not, // ! - logical not
 }
 
@@ -39,6 +119,7 @@ pub enum UnaryOp {
 pub enum PostfixOp {
     Index,
     Call,
+    STAR_STAR, // exponentiation
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -63,10 +144,12 @@ impl fmt::Display for Ops {
             Ops::BinaryOp(BinaryOp::Gt) => write!(f, ">"),
             Ops::BinaryOp(BinaryOp::Ge) => write!(f, ">="),
 
+            Ops::UnaryOp(UnaryOp::Negate) => write!(f, "-"),
             Ops::UnaryOp(UnaryOp::Not) => write!(f, "!"),
 
             Ops::PostfixOp(PostfixOp::Index) => write!(f, "["),
             Ops::PostfixOp(PostfixOp::Call) => write!(f, "."),
+            Ops::PostfixOp(PostfixOp::STAR_STAR) => write!(f, "**"),
             // Ops::PostfixOp(PostfixOp::Args) => write!(f, ","),
         }
     }
@@ -86,6 +169,19 @@ impl fmt::Display for ASTNode {
                 }
                 write!(f, ")")
             }
+            ASTNode::Print(expr) => {
+                write!(f, "print!(")?;
+                for e in expr {
+                    write!(f, "{}, ", e)?;
+                }
+                write!(f, ")")
+            }
+            ASTNode::Let(identifier, expr) => {
+                write!(f, "let {} = {}", identifier, expr[0])
+            }
+            ASTNode::Assign(identifier, expr) => {
+                write!(f, "{} = {}", identifier, expr[0])
+            }
             ASTNode::Op(head, rest) => {
                 write!(f, "({}", head)?;
                 for s in rest {
@@ -97,7 +193,7 @@ impl fmt::Display for ASTNode {
     }
 }
 
-pub fn expr_bp(lexer: &mut Lexer, min_bp: u8) -> ASTNode {
+fn expr_bp(lexer: &mut Lexer, min_bp: u8) -> ASTNode {
     let current_token = lexer.next();
 
     let mut lhs = match current_token.token_type {
@@ -122,10 +218,11 @@ pub fn expr_bp(lexer: &mut Lexer, min_bp: u8) -> ASTNode {
         | TokenType::GREATER
         | TokenType::GREATER_EQUAL
         | TokenType::DOT
+        | TokenType::STAR_STAR
         | TokenType::BANG => {
             let op = match current_token.token_type {
                 TokenType::PLUS => Ops::BinaryOp(BinaryOp::Add),
-                TokenType::MINUS => Ops::BinaryOp(BinaryOp::Sub),
+                TokenType::MINUS => Ops::UnaryOp(UnaryOp::Negate),
                 TokenType::STAR => Ops::BinaryOp(BinaryOp::Mul),
                 TokenType::SLASH => Ops::BinaryOp(BinaryOp::Div),
                 TokenType::AT => Ops::BinaryOp(BinaryOp::At),
@@ -138,6 +235,8 @@ pub fn expr_bp(lexer: &mut Lexer, min_bp: u8) -> ASTNode {
                 TokenType::GREATER_EQUAL => Ops::BinaryOp(BinaryOp::Ge),
 
                 TokenType::DOT => Ops::PostfixOp(PostfixOp::Call),
+                TokenType::STAR_STAR => Ops::PostfixOp(PostfixOp::STAR_STAR),
+
                 TokenType::BANG => Ops::UnaryOp(UnaryOp::Not),
 
                 _ => unreachable!(),
@@ -168,13 +267,16 @@ pub fn expr_bp(lexer: &mut Lexer, min_bp: u8) -> ASTNode {
             TokenType::GREATER_EQUAL => Ops::BinaryOp(BinaryOp::Ge),
 
             TokenType::DOT => Ops::PostfixOp(PostfixOp::Call),
-            TokenType::BANG => Ops::UnaryOp(UnaryOp::Not),
+            TokenType::LEFT_BRACKET => Ops::PostfixOp(PostfixOp::Index),
+            TokenType::STAR_STAR => Ops::PostfixOp(PostfixOp::STAR_STAR),
+
+            TokenType::BANG => Ops::UnaryOp(UnaryOp::Negate),
+
             TokenType::LEFT_PAREN => break,
             TokenType::RIGHT_PAREN => break,
-            TokenType::LEFT_BRACKET => Ops::PostfixOp(PostfixOp::Index),
             TokenType::RIGHT_BRACKET => break,
-
             TokenType::COMMA => break,
+            TokenType::SEMICOLON => break,
             t => panic!("bad token: {:?}", t),
         };
 
@@ -228,6 +330,9 @@ pub fn expr_bp(lexer: &mut Lexer, min_bp: u8) -> ASTNode {
                     // ],
                     vec![lhs, ASTNode::Callee(callee_token.lexeme, args)],
                 )
+            } else if op == Ops::PostfixOp(PostfixOp::STAR_STAR) {
+                let rhs = expr_bp(lexer, 0);
+                ASTNode::Op(op, vec![lhs, rhs])
             } else {
                 ASTNode::Op(op, vec![lhs])
             };
@@ -263,9 +368,8 @@ pub fn expr_bp(lexer: &mut Lexer, min_bp: u8) -> ASTNode {
 
 fn prefix_binding_power(op: Ops) -> ((), u8) {
     match op {
-        Ops::BinaryOp(BinaryOp::Add)
-        | Ops::BinaryOp(BinaryOp::Sub)
-        | Ops::UnaryOp(UnaryOp::Not) => ((), 15),
+        | Ops::UnaryOp(UnaryOp::Not)
+        | Ops::UnaryOp(UnaryOp::Negate) => ((), 15),
         _ => panic!("bad op: {:?}", op),
     }
 }
@@ -276,6 +380,7 @@ fn postfix_binding_power(op: Ops) -> Option<(u8, ())> {
         // '[' => (11, ()),
         Ops::PostfixOp(PostfixOp::Index) => (13, ()),
         Ops::PostfixOp(PostfixOp::Call) => (14, ()),
+        Ops::PostfixOp(PostfixOp::STAR_STAR) => (16, ()),
         _ => return None,
     };
     Some(res)
@@ -310,73 +415,102 @@ mod tests {
 
     #[test]
     fn test_expr() {
-        fn expr(source: &str) -> ASTNode {
+        fn expr(source: &str) -> String {
             let mut lexer = Lexer::new(source.to_string());
-            expr_bp(&mut lexer, 0)
+            format!("{}", expr_bp(&mut lexer, 0))
         }
 
         let s = expr("1");
-        assert_eq!(s.to_string(), "1");
+        assert_eq!(s, "1");
 
         let s = expr("1 + 2 * 3");
-        assert_eq!(s.to_string(), "(+ 1 (* 2 3))");
+        assert_eq!(s, "(+ 1 (* 2 3))");
 
         let s = expr("(1 + 2) * 3");
-        assert_eq!(s.to_string(), "(* (+ 1 2) 3)");
+        assert_eq!(s, "(* (+ 1 2) 3)");
 
         let s = expr("a + b * c * d + e");
-        assert_eq!(s.to_string(), "(+ (+ a (* (* b c) d)) e)");
+        assert_eq!(s, "(+ (+ a (* (* b c) d)) e)");
 
         let s = expr("a + b * c * d + e");
-        assert_eq!(s.to_string(), "(+ (+ a (* (* b c) d)) e)");
+        assert_eq!(s, "(+ (+ a (* (* b c) d)) e)");
 
         let s = expr("f @ g @ h");
-        assert_eq!(s.to_string(), "(@ f (@ g h))");
+        assert_eq!(s, "(@ f (@ g h))");
 
         let s = expr("1 + 2 + f @ g @ h * 3 * 4");
-        assert_eq!(s.to_string(), "(+ (+ 1 2) (* (* (@ f (@ g h)) 3) 4))");
+        assert_eq!(s, "(+ (+ 1 2) (* (* (@ f (@ g h)) 3) 4))");
 
         let s = expr("--1 * 2");
-        assert_eq!(s.to_string(), "(* (- (- 1)) 2)");
+        assert_eq!(s, "(* (- (- 1)) 2)");
 
         let s = expr("--f @ g");
-        assert_eq!(s.to_string(), "(@ (- (- f)) g)");
+        assert_eq!(s, "(@ (- (- f)) g)");
 
         // let s = expr(r""sfsad"+"sdf"--4");
-        // assert_eq!(s.to_string(), "(+ \"sfsad\" \"sdf\" (- (- 4))");
+        // assert_eq!(s, "(+ \"sfsad\" \"sdf\" (- (- 4))");
 
         let s = expr("-!9");
-        assert_eq!(s.to_string(), "(- (! 9))");
+        assert_eq!(s, "(- (! 9))");
 
         let s = expr("! f @ g ");
-        assert_eq!(s.to_string(), "(@ (! f) g)");
+        assert_eq!(s, "(@ (! f) g)");
 
         let s = expr("(((0)))");
-        assert_eq!(s.to_string(), "0");
+        assert_eq!(s, "0");
 
         let s = expr("x[0][1]");
-        assert_eq!(s.to_string(), "([ ([ x 0) 1)");
+        assert_eq!(s, "([ ([ x 0) 1)");
 
         let s = expr("x.relu()");
-        assert_eq!(s.to_string(), "(. x (relu))");
+        assert_eq!(s, "(. x (relu))");
 
         let s = expr("x.relu(0, 1).relu(2, 3)");
-        assert_eq!(s.to_string(), "(. (. x (relu 0 1)) (relu 2 3))");
+        assert_eq!(s, "(. (. x (relu 0 1)) (relu 2 3))");
 
         let s = expr("x.relu(a.b(0+2), 2-1).max(0)/2");
         assert_eq!(
-            s.to_string(),
+            s,
             "(/ (. (. x (relu (. a (b (+ 0 2))) (- 2 1))) (max 0)) 2)"
         );
+
+        let s = expr("a == b");
+        assert_eq!(s, "(== a b)");
+
+        let s = expr("--1");
+        assert_eq!(s, "(- (- 1))");
 
         // let s = expr(
         //     "a ? b :
         //      c ? d
         //      : e",
         // );
-        // assert_eq!(s.to_string(), "(? a b (? c d e))");
+        // assert_eq!(s, "(? a b (? c d e))");
 
         // let s = expr("a = 0 ? b : c = d");
-        // assert_eq!(s.to_string(), "(= a (= (? 0 b c) d))")
+        // assert_eq!(s, "(= a (= (? 0 b c) d))")
+    }
+    #[test]
+    fn test_parser() {
+        fn parse(source: &str) -> String {
+            let mut lexer = Lexer::new(source.to_string());
+            let out = Parser::new(&mut lexer).parse();
+            assert!(out.len() == 1);
+            format!("{}", out[0])
+        }
+
+        // let declaration tests; let a= 3;
+        let s = parse("let a = 3;");
+        assert_eq!(s, "let a = 3");
+
+        // let s = parse("let a = 3; let b = 4;");
+        // assert_eq!(s, "let a = 3; let b = 4");
+
+        // assignment tests; a = 3, a+=3, a-=4, a*=5, a/=6
+        let s = parse("a += 3;");
+        assert_eq!(s, "a = (+ a 3)");
+
+        let s = parse("a += (c == 4);");
+        assert_eq!(s, "a = (+ a (== c 4))");
     }
 }
