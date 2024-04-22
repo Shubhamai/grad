@@ -7,6 +7,5 @@ description = "A programming language with built-in autograd"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-ariadne = "0.4.0"
 clap = { version = "4.5.4", features = ["derive"] }
 logos = "0.14.0"
