@@ -1,8 +1,8 @@
-use crate::interner::StringObjIdx;
+use crate::{interner::StringObjIdx, tensor::Tensor};
 
 #[derive(Debug, Clone, Copy)]
 pub enum ValueType {
-    Number(f64), // TODO: Ideally, it should be seperate types for int and float (maybe?)
+    Tensor(Tensor), // TODO: Ideally, it should be seperate types for int and float (maybe?)
     String(StringObjIdx),
     Identifier(StringObjIdx),
     Boolean(bool),
@@ -10,11 +10,10 @@ pub enum ValueType {
     // Lists, Dicts, Tensors, etc.
 }
 
-
 impl std::fmt::Display for ValueType {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            ValueType::Number(n) => write!(f, "num->{}", n),
+            ValueType::Tensor(n) => write!(f, "num->{}", n),
             ValueType::String(s) => write!(f, "str->{}", s),
             ValueType::Identifier(s) => write!(f, "iden->{}", s),
             ValueType::Boolean(b) => write!(f, "bool->{}", b),
@@ -29,7 +28,7 @@ impl std::ops::Add for ValueType {
 
     fn add(self, other: Self) -> Self {
         match (self, other) {
-            (ValueType::Number(a), ValueType::Number(b)) => ValueType::Number(a + b),
+            (ValueType::Tensor(a), ValueType::Tensor(b)) => ValueType::Tensor(a + b),
             (ValueType::String(a), ValueType::String(b)) => ValueType::String(a + b),
             _ => panic!("Operands must be numbers."),
         }
@@ -41,7 +40,7 @@ impl std::ops::Sub for ValueType {
 
     fn sub(self, other: Self) -> Self {
         match (self, other) {
-            (ValueType::Number(a), ValueType::Number(b)) => ValueType::Number(a - b),
+            (ValueType::Tensor(a), ValueType::Tensor(b)) => ValueType::Tensor(a - b),
             _ => panic!("Operands must be numbers."),
         }
     }
@@ -52,7 +51,7 @@ impl std::ops::Mul for ValueType {
 
     fn mul(self, other: Self) -> Self {
         match (self, other) {
-            (ValueType::Number(a), ValueType::Number(b)) => ValueType::Number(a * b),
+            (ValueType::Tensor(a), ValueType::Tensor(b)) => ValueType::Tensor(a * b),
             _ => panic!("Operands must be numbers."),
         }
     }
@@ -63,7 +62,7 @@ impl std::ops::Div for ValueType {
 
     fn div(self, other: Self) -> Self {
         match (self, other) {
-            (ValueType::Number(a), ValueType::Number(b)) => ValueType::Number(a / b),
+            (ValueType::Tensor(a), ValueType::Tensor(b)) => ValueType::Tensor(a / b),
             _ => panic!("Operands must be numbers."),
         }
     }
@@ -74,7 +73,7 @@ impl std::ops::Neg for ValueType {
 
     fn neg(self) -> Self {
         match self {
-            ValueType::Number(n) => ValueType::Number(-n),
+            ValueType::Tensor(n) => ValueType::Tensor(-n),
             _ => panic!("Operand must be a number."),
         }
     }
@@ -95,7 +94,7 @@ impl std::ops::Not for ValueType {
 impl std::cmp::PartialEq for ValueType {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
-            (ValueType::Number(a), ValueType::Number(b)) => a == b,
+            (ValueType::Tensor(a), ValueType::Tensor(b)) => a == b,
             (ValueType::Boolean(a), ValueType::Boolean(b)) => a == b,
             (ValueType::Nil, ValueType::Nil) => true,
             _ => false,
@@ -106,7 +105,7 @@ impl std::cmp::PartialEq for ValueType {
 impl std::cmp::PartialOrd for ValueType {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         match (self, other) {
-            (ValueType::Number(a), ValueType::Number(b)) => a.partial_cmp(b),
+            (ValueType::Tensor(a), ValueType::Tensor(b)) => a.partial_cmp(b),
             _ => None,
         }
     }

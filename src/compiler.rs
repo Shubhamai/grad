@@ -2,6 +2,7 @@ use crate::{
     ast::{ASTNode, BinaryOp, Ops, PostfixOp, UnaryOp},
     chunk::{Chunk, OpCode, VectorType},
     interner::Interner,
+    tensor::Tensor,
     value::ValueType,
 };
 
@@ -33,7 +34,7 @@ impl Compiler {
             ASTNode::Number(n) => {
                 self.chunk.write(VectorType::Code(OpCode::OpConstant));
 
-                let constant = self.chunk.add_constant(ValueType::Number(n));
+                let constant = self.chunk.add_constant(ValueType::Tensor(Tensor::new(n)));
                 self.chunk.write(VectorType::Constant(constant));
             }
             ASTNode::Boolean(b) => {
@@ -105,7 +106,14 @@ impl Compiler {
                     Ops::PostfixOp(PostfixOp::STAR_STAR) => {
                         self.chunk.write(VectorType::Code(OpCode::OpPower))
                     }
-                    _ => println!("Invalid operator"), // TODO: handle this error
+                    Ops::PostfixOp(PostfixOp::Call) => {
+                        println!("Call");
+                        self.chunk.write(VectorType::Code(OpCode::OpCall));
+                        self.chunk
+                            .write(VectorType::Constant(self.chunk.constants.len() - 1));
+                        // TODO: need for testing for this - a.relu(c.relu()), a.relu().relu()
+                    }
+                    x => println!("Invalid operator {:?}", x),
                 }
             }
             ASTNode::Print(expr) => {
@@ -138,6 +146,20 @@ impl Compiler {
 
                 self.chunk.write(VectorType::Code(OpCode::OpSetGlobal));
                 self.chunk.write(VectorType::Constant(global));
+            }
+            ASTNode::Callee(iden, args) => {
+                println!("Callee");
+                let global = self
+                    .chunk
+                    .add_constant(ValueType::Identifier(self.interner.intern_string(iden)));
+                self.chunk.write(VectorType::Constant(global));
+
+                // for arg in args {
+                //     self.visit(arg.clone());
+                // }
+
+                // self.chunk.write(VectorType::Code(OpCode::OpCall));
+                // self.chunk.write(VectorType::Constant(args.len()));
             }
             _ => println!("Invalid ASTNode"), // TODO: handle this error
         }

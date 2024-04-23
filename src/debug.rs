@@ -52,7 +52,8 @@ impl Debug {
                 chunk::OpCode::OpConstant
                 | chunk::OpCode::OpDefineGlobal
                 | chunk::OpCode::OpGetGlobal
-                | chunk::OpCode::OpSetGlobal,
+                | chunk::OpCode::OpSetGlobal
+                | chunk::OpCode::OpCall,
             ) => {
                 let constant = self.chunk.code[offset + 1];
                 match constant {
@@ -69,7 +70,7 @@ impl Debug {
                 return offset + 2;
             }
             chunk::VectorType::Constant(_) => {
-                return offset +1;
+                return offset + 1;
             }
         }
     }

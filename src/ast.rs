@@ -111,7 +111,7 @@ pub enum BinaryOp {
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum UnaryOp {
-    Negate, 
+    Negate,
     Not, // ! - logical not
 }
 
@@ -368,8 +368,7 @@ fn expr_bp(lexer: &mut Lexer, min_bp: u8) -> ASTNode {
 
 fn prefix_binding_power(op: Ops) -> ((), u8) {
     match op {
-        | Ops::UnaryOp(UnaryOp::Not)
-        | Ops::UnaryOp(UnaryOp::Negate) => ((), 15),
+        Ops::UnaryOp(UnaryOp::Not) | Ops::UnaryOp(UnaryOp::Negate) => ((), 15),
         _ => panic!("bad op: {:?}", op),
     }
 }
@@ -474,6 +473,9 @@ mod tests {
             "(/ (. (. x (relu (. a (b (+ 0 2))) (- 2 1))) (max 0)) 2)"
         );
 
+        let s = expr("x.relu(a.sigmoid(0+2))");
+        assert_eq!(s, "(. x (relu (. a (sigmoid (+ 0 2)))))");
+
         let s = expr("a == b");
         assert_eq!(s, "(== a b)");
 
@@ -512,5 +514,11 @@ mod tests {
 
         let s = parse("a += (c == 4);");
         assert_eq!(s, "a = (+ a (== c 4))");
+
+        let s = parse("a -= 4;");
+        assert_eq!(s, "a = (- a 4)");
+
+        let s = parse("a *= (5 != 4);");
+        assert_eq!(s, "a = (* a (!= 5 4))");
     }
 }

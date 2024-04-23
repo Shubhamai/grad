@@ -91,8 +91,8 @@ impl VM {
                     let b = self.pop();
                     let a = self.pop();
                     match (a, b) {
-                        (ValueType::Number(a), ValueType::Number(b)) => {
-                            self.push(ValueType::Number(a.powf(b)));
+                        (ValueType::Tensor(a), ValueType::Tensor(b)) => {
+                            self.push(ValueType::Tensor(a.powf(b)));
                         }
                         _ => {
                             println!("Operands must be numbers.");
@@ -222,10 +222,45 @@ impl VM {
                         }
                     }
                 }
-                VectorType::Constant(const_idx) => {
-                    // println!("Constant: {:?}", const_idx);
-                    // self.push(self.chunk.constants[const_idx]);
+                chunk::VectorType::Code(chunk::OpCode::OpCall) => {
+                    // relu
+                    let callee = self.read_byte();
+
+                    // a ?
+                    let caller = self.pop();
+
+                    let str_idx = match callee {
+                        VectorType::Constant(idx) => match self.read_constant(idx as usize) {
+                            ValueType::Identifier(idx) => idx,
+                            _ => {
+                                println!("Invalid function");
+                                return InterpretResult::InterpretRuntimeError;
+                            }
+                        },
+                        _ => {
+                            println!("Invalid function");
+                            return InterpretResult::InterpretRuntimeError;
+                        }
+                    };
+                    let calle_str = self.interner.lookup(str_idx);
+
+                    match calle_str {
+                        "relu" => match caller {
+                            ValueType::Tensor(a) => {
+                                self.push(ValueType::Tensor(a.relu()));
+                            }
+                            _ => {
+                                println!("Invalid function");
+                                return InterpretResult::InterpretRuntimeError;
+                            }
+                        },
+                        _ => {
+                            println!("Undefined function");
+                            return InterpretResult::InterpretRuntimeError;
+                        }
+                    }
                 }
+                VectorType::Constant(_) => {}
             }
         }
     }

@@ -4,6 +4,7 @@ mod compiler;
 mod debug;
 mod interner;
 mod scanner;
+mod tensor;
 mod value;
 mod vm;
 
@@ -63,7 +64,9 @@ fn run_repl() {
         let mut lexer = Lexer::new(input.to_string());
 
         let out = Parser::new(&mut lexer).parse();
-        println!("{:?}", out);
+        for stmt in out.iter() {
+            println!("{};", stmt);
+        }
 
         let mut compiler = compiler::Compiler::new();
         let (bytecode, interner) = compiler.compile(out);
@@ -85,7 +88,10 @@ pub fn run_source(src: &str) -> InterpretResult {
     let mut lexer = Lexer::new(src.to_string());
 
     let out = Parser::new(&mut lexer).parse();
-    println!("{:?}", out);
+    for stmt in out.iter() {
+        println!("{:?}", stmt);
+    }
+    println!("-------------");
 
     let mut compiler = compiler::Compiler::new();
     let (bytecode, interner) = compiler.compile(out);
@@ -104,7 +110,7 @@ pub fn run_source(src: &str) -> InterpretResult {
 
 #[cfg(test)]
 mod tests {
-    use crate::{run_source, value::ValueType, vm::InterpretResult};
+    use crate::{run_source, tensor::Tensor, value::ValueType, vm::InterpretResult};
 
     #[test]
     fn test_micrograd_example() {
@@ -115,14 +121,20 @@ mod tests {
                         let d = a * b + b**3;
                         c += c + 1;
                         c += 1 + c + (-a);
-                        print(c == -1);
+                        d += d * 2 + (b + a).relu();
+                        d += 3 * d + (b - a).relu();
+                        let e = c - d;
+                        let f = e**2;
+                        let g = f / 2.0;
+                        g += 10.0 / f;        
+                        print(g) // prints 24.7041, the outcome of this forward pass
                         "#;
 
         let out = run_source(&src);
 
         assert_eq!(
             out,
-            InterpretResult::InterpretOk(vec![ValueType::Boolean(true)])
+            InterpretResult::InterpretOk(vec![ValueType::Tensor(Tensor::new(24.70408163265306))])
         );
     }
 }

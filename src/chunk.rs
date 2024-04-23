@@ -22,6 +22,8 @@ pub enum OpCode {
     OpGetGlobal,
     OpSetGlobal,
     OpPower,
+
+    OpCall,
 }
 
 impl std::fmt::Display for OpCode {
@@ -47,6 +49,7 @@ impl std::fmt::Display for OpCode {
             OpCode::OpGetGlobal => write!(f, "OP_GET_GLOBAL"),
             OpCode::OpSetGlobal => write!(f, "OP_SET_GLOBAL"),
             OpCode::OpPower => write!(f, "OP_POWER"),
+            OpCode::OpCall => write!(f, "OP_CALL"),
         }
     }
 }
