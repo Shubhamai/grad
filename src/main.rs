@@ -11,6 +11,7 @@ mod vm;
 use clap::Parser as ClapParser;
 use std::io::Write;
 use vm::InterpretResult;
+use wasm_bindgen::prelude::*;
 
 use crate::{ast::Parser, scanner::Lexer};
 
@@ -28,8 +29,9 @@ fn main() {
     // Check if args.script is provided
     if args.script.is_empty() {
         // run as a repl
+        // run_repl();
 
-        run_repl();
+        panic!("REPL is not supported yet.");
     } else {
         // read file
 
@@ -42,48 +44,49 @@ fn main() {
     }
 }
 
-fn run_repl() {
-    loop {
-        // print prompt
-        print!("> ");
-        let _ = std::io::stdout().flush();
+// fn run_repl() {
+//     loop {
+//         // print prompt
+//         print!("> ");
+//         let _ = std::io::stdout().flush();
 
-        // read input
-        let mut input = String::new();
-        input = match std::io::stdin().read_line(&mut input) {
-            Ok(_) => input,
-            Err(e) => panic!("Error reading input: {}", e),
-        };
+//         // read input
+//         let mut input = String::new();
+//         input = match std::io::stdin().read_line(&mut input) {
+//             Ok(_) => input,
+//             Err(e) => panic!("Error reading input: {}", e),
+//         };
 
-        // exit if input is "exit"
-        if input.trim() == "exit" || input.trim() == "" {
-            break;
-        }
+//         // exit if input is "exit"
+//         if input.trim() == "exit" || input.trim() == "" {
+//             break;
+//         }
 
-        // ======================== REPL ========================
-        let mut lexer = Lexer::new(input.to_string());
+//         // ======================== REPL ========================
+//         let mut lexer = Lexer::new(input.to_string());
 
-        let out = Parser::new(&mut lexer).parse();
-        for stmt in out.iter() {
-            println!("{};", stmt);
-        }
+//         let out = Parser::new(&mut lexer).parse();
+//         for stmt in out.iter() {
+//             println!("{};", stmt);
+//         }
 
-        let mut compiler = compiler::Compiler::new();
-        let (bytecode, interner) = compiler.compile(out);
+//         let mut compiler = compiler::Compiler::new();
+//         let (bytecode, interner) = compiler.compile(out);
 
-        println!("{:?}", bytecode);
+//         println!("{:?}", bytecode);
 
-        let debug = debug::Debug::new("test", bytecode.clone());
-        debug.disassemble();
+//         let debug = debug::Debug::new("test", bytecode.clone());
+//         debug.disassemble();
 
-        let mut vm = vm::VM::init(bytecode, interner);
-        let result = vm.run();
-        // println!("{:?}", result);
+//         let mut vm = vm::VM::init(bytecode, interner);
+//         let result = vm.run();
+//         // println!("{:?}", result);
 
-        // ======================== REPL ========================
-    }
-}
+//         // ======================== REPL ========================
+//     }
+// }
 
+#[wasm_bindgen]
 pub fn run_source(src: &str) -> InterpretResult {
     let mut lexer = Lexer::new(src.to_string());
 

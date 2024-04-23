@@ -11,17 +11,6 @@ pub struct Interner {
 }
 
 impl Interner {
-    pub fn intern(&mut self, name: &str) -> StringObjIdx {
-        if let Some(&idx) = self.map.get(name) {
-            return idx;
-        }
-        let idx = self.map.len() as StringObjIdx;
-        self.map.insert(name.to_owned(), idx);
-        self.vec.push(name.to_owned());
-
-        idx
-    }
-
     pub fn intern_string(&mut self, name: String) -> StringObjIdx {
         if let Some(&idx ) = self.map.get(&name) {
             return idx;

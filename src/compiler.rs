@@ -74,6 +74,10 @@ impl Compiler {
                     Ops::BinaryOp(BinaryOp::Mul) => {
                         self.chunk.write(VectorType::Code(OpCode::OpMultiply))
                     }
+                    // @ - dot product - TODO: need to implement
+                    Ops::BinaryOp(BinaryOp::At) => {
+                        self.chunk.write(VectorType::Code(OpCode::OpMultiply))
+                    }
                     Ops::BinaryOp(BinaryOp::Div) => {
                         self.chunk.write(VectorType::Code(OpCode::OpDivide))
                     }
@@ -103,7 +107,7 @@ impl Compiler {
                         self.chunk.write(VectorType::Code(OpCode::OpNegate))
                     }
 
-                    Ops::PostfixOp(PostfixOp::STAR_STAR) => {
+                    Ops::PostfixOp(PostfixOp::StarStar) => {
                         self.chunk.write(VectorType::Code(OpCode::OpPower))
                     }
                     Ops::PostfixOp(PostfixOp::Call) => {
@@ -113,7 +117,7 @@ impl Compiler {
                             .write(VectorType::Constant(self.chunk.constants.len() - 1));
                         // TODO: need for testing for this - a.relu(c.relu()), a.relu().relu()
                     }
-                    x => println!("Invalid operator {:?}", x),
+                    Ops::UnaryOp(UnaryOp::Not) | Ops::PostfixOp(PostfixOp::Index) => todo!(),
                 }
             }
             ASTNode::Print(expr) => {
@@ -147,12 +151,14 @@ impl Compiler {
                 self.chunk.write(VectorType::Code(OpCode::OpSetGlobal));
                 self.chunk.write(VectorType::Constant(global));
             }
-            ASTNode::Callee(iden, args) => {
+            ASTNode::Callee(iden, _) => {
                 println!("Callee");
                 let global = self
                     .chunk
                     .add_constant(ValueType::Identifier(self.interner.intern_string(iden)));
                 self.chunk.write(VectorType::Constant(global));
+
+                // TODO: need to implement args
 
                 // for arg in args {
                 //     self.visit(arg.clone());
@@ -161,7 +167,6 @@ impl Compiler {
                 // self.chunk.write(VectorType::Code(OpCode::OpCall));
                 // self.chunk.write(VectorType::Constant(args.len()));
             }
-            _ => println!("Invalid ASTNode"), // TODO: handle this error
         }
     }
 }

@@ -119,7 +119,7 @@ pub enum UnaryOp {
 pub enum PostfixOp {
     Index,
     Call,
-    STAR_STAR, // exponentiation
+    StarStar, // exponentiation
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -149,7 +149,7 @@ impl fmt::Display for Ops {
 
             Ops::PostfixOp(PostfixOp::Index) => write!(f, "["),
             Ops::PostfixOp(PostfixOp::Call) => write!(f, "."),
-            Ops::PostfixOp(PostfixOp::STAR_STAR) => write!(f, "**"),
+            Ops::PostfixOp(PostfixOp::StarStar) => write!(f, "**"),
             // Ops::PostfixOp(PostfixOp::Args) => write!(f, ","),
         }
     }
@@ -235,7 +235,7 @@ fn expr_bp(lexer: &mut Lexer, min_bp: u8) -> ASTNode {
                 TokenType::GREATER_EQUAL => Ops::BinaryOp(BinaryOp::Ge),
 
                 TokenType::DOT => Ops::PostfixOp(PostfixOp::Call),
-                TokenType::STAR_STAR => Ops::PostfixOp(PostfixOp::STAR_STAR),
+                TokenType::STAR_STAR => Ops::PostfixOp(PostfixOp::StarStar),
 
                 TokenType::BANG => Ops::UnaryOp(UnaryOp::Not),
 
@@ -268,7 +268,7 @@ fn expr_bp(lexer: &mut Lexer, min_bp: u8) -> ASTNode {
 
             TokenType::DOT => Ops::PostfixOp(PostfixOp::Call),
             TokenType::LEFT_BRACKET => Ops::PostfixOp(PostfixOp::Index),
-            TokenType::STAR_STAR => Ops::PostfixOp(PostfixOp::STAR_STAR),
+            TokenType::STAR_STAR => Ops::PostfixOp(PostfixOp::StarStar),
 
             TokenType::BANG => Ops::UnaryOp(UnaryOp::Negate),
 
@@ -307,30 +307,9 @@ fn expr_bp(lexer: &mut Lexer, min_bp: u8) -> ASTNode {
                     }
                 }
 
-                // let mut args = HashMap::new();
-                // while lexer.peek().token_type != TokenType::RIGHT_PAREN {
-
-                //     // let key = lexer.next().lexeme;
-                //     // assert_eq!(lexer.next().token_type, TokenType::EQUAL);
-                //     // let value = expr_bp(lexer, 0);
-                //     // args.insert(key, value);
-
-                //     if lexer.peek().token_type == TokenType::COMMA {
-                //         lexer.next();
-                //     }
-                // }
-
                 lexer.next();
-                ASTNode::Op(
-                    op,
-                    // vec![
-                    //     lhs,
-                    //     S::Identifier(callee_token.lexeme),
-                    //     S::Op(Ops::PostfixOp(PostfixOp::Args), args),
-                    // ],
-                    vec![lhs, ASTNode::Callee(callee_token.lexeme, args)],
-                )
-            } else if op == Ops::PostfixOp(PostfixOp::STAR_STAR) {
+                ASTNode::Op(op, vec![lhs, ASTNode::Callee(callee_token.lexeme, args)])
+            } else if op == Ops::PostfixOp(PostfixOp::StarStar) {
                 let rhs = expr_bp(lexer, 0);
                 ASTNode::Op(op, vec![lhs, rhs])
             } else {
@@ -379,7 +358,7 @@ fn postfix_binding_power(op: Ops) -> Option<(u8, ())> {
         // '[' => (11, ()),
         Ops::PostfixOp(PostfixOp::Index) => (13, ()),
         Ops::PostfixOp(PostfixOp::Call) => (14, ()),
-        Ops::PostfixOp(PostfixOp::STAR_STAR) => (16, ()),
+        Ops::PostfixOp(PostfixOp::StarStar) => (16, ()),
         _ => return None,
     };
     Some(res)
