@@ -8,12 +8,9 @@ mod tensor;
 mod value;
 mod vm;
 
-use clap::Parser as ClapParser;
-use std::io::Write;
-use vm::InterpretResult;
-use wasm_bindgen::prelude::*;
-
 use crate::{ast::Parser, scanner::Lexer};
+use clap::Parser as ClapParser;
+use vm::Result;
 
 #[derive(ClapParser, Debug)]
 #[command(version, about, long_about = None)]
@@ -86,19 +83,18 @@ fn main() {
 //     }
 // }
 
-#[wasm_bindgen]
-pub fn run_source(src: &str) -> InterpretResult {
+pub fn run_source(src: &str) -> Result {
     let mut lexer = Lexer::new(src.to_string());
 
     let out = Parser::new(&mut lexer).parse();
     for stmt in out.iter() {
-        println!("{:?}", stmt);
+        println!("{}", stmt);
     }
     println!("-------------");
 
     let mut compiler = compiler::Compiler::new();
     let (bytecode, interner) = compiler.compile(out);
-    println!("{:?}", bytecode);
+    // println!("{:?}", bytecode);
 
     let debug = debug::Debug::new("test", bytecode.clone());
     debug.disassemble();
@@ -106,14 +102,14 @@ pub fn run_source(src: &str) -> InterpretResult {
     let mut vm = vm::VM::init(bytecode, interner);
     let result = vm.run();
 
-    println!("{:?}", result);
+    // println!("{:?}", result);
 
     return result;
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::{run_source, tensor::Tensor, value::ValueType, vm::InterpretResult};
+    use crate::{run_source, tensor::Tensor, value::ValueType, vm::Result};
 
     #[test]
     fn test_micrograd_example() {
@@ -137,7 +133,7 @@ mod tests {
 
         assert_eq!(
             out,
-            InterpretResult::InterpretOk(vec![ValueType::Tensor(Tensor::new(24.70408163265306))])
+            Result::Ok(vec![ValueType::Tensor(Tensor::from(24.70408163265306))])
         );
     }
 }

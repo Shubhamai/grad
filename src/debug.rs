@@ -1,4 +1,5 @@
 use crate::chunk;
+use colored::*;
 
 pub struct Debug {
     name: String,
@@ -14,14 +15,19 @@ impl Debug {
     }
 
     pub fn disassemble(&self) {
-        println!("======== {} ========", self.name);
+        println!(
+            "{} {} {}",
+            "======== ".blue().bold(),
+            self.name.blue().bold(),
+            " ========".blue().bold()
+        );
 
         let mut offset = 0;
         while offset < self.chunk.code.len() {
             offset = self.disassemble_instruction(offset);
         }
 
-        println!("====================");
+        println!("{}", "====================".blue().bold());
     }
 
     pub fn disassemble_instruction(&self, offset: usize) -> usize {
@@ -44,7 +50,11 @@ impl Debug {
             | chunk::VectorType::Code(chunk::OpCode::OpLess)
             | chunk::VectorType::Code(chunk::OpCode::OpPrint)
             | chunk::VectorType::Code(chunk::OpCode::OpPop) => {
-                println!("{:04} {}", offset, instruction);
+                println!(
+                    "{:04} {}",
+                    offset.to_string().yellow(),
+                    instruction.to_string().red()
+                );
 
                 return offset + 1;
             }
@@ -60,7 +70,14 @@ impl Debug {
                     chunk::VectorType::Constant(idx) => {
                         println!(
                             "{:04} {} {:04} | {}",
-                            offset, instruction, constant, self.chunk.constants[idx]
+                            offset.to_string().yellow(),
+                            instruction.to_string().red(),
+                            constant.to_string().green().italic(),
+                            self.chunk.constants[idx]
+                                .to_string()
+                                .purple()
+                                .magenta()
+                                .italic()
                         );
                     }
                     _ => {

@@ -1,6 +1,6 @@
 use crate::{interner::StringObjIdx, tensor::Tensor};
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub enum ValueType {
     Tensor(Tensor), // TODO: Ideally, it should be seperate types for int and float (maybe?)
     String(StringObjIdx),
@@ -13,7 +13,7 @@ pub enum ValueType {
 impl std::fmt::Display for ValueType {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            ValueType::Tensor(n) => write!(f, "num->{}", n),
+            ValueType::Tensor(n) => write!(f, "tensor->{}", n),
             ValueType::String(s) => write!(f, "str->{}", s),
             ValueType::Identifier(s) => write!(f, "iden->{}", s),
             ValueType::Boolean(b) => write!(f, "bool->{}", b),
@@ -29,7 +29,6 @@ impl std::ops::Add for ValueType {
     fn add(self, other: Self) -> Self {
         match (self, other) {
             (ValueType::Tensor(a), ValueType::Tensor(b)) => ValueType::Tensor(a + b),
-            (ValueType::String(a), ValueType::String(b)) => ValueType::String(a + b),
             _ => panic!("Operands must be numbers."),
         }
     }
@@ -105,8 +104,18 @@ impl std::cmp::PartialEq for ValueType {
 impl std::cmp::PartialOrd for ValueType {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         match (self, other) {
-            (ValueType::Tensor(a), ValueType::Tensor(b)) => a.partial_cmp(b),
+            // (ValueType::Tensor(a), ValueType::Tensor(b)) => a.partial_cmp(b),
             _ => None,
+        }
+    }
+}
+
+// impl powf value
+impl ValueType {
+    pub fn pow(&self, other: &Self) -> Self {
+        match (self, other) {
+            (ValueType::Tensor(a), ValueType::Tensor(b)) => ValueType::Tensor(a.pow(b)),
+            _ => panic!("Operands must be numbers."),
         }
     }
 }

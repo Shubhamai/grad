@@ -13,22 +13,22 @@ pub enum LexingError {
 pub enum TokenType {
     // Single-character tokens.
     #[token("(")]
-    LEFT_PAREN,
+    LeftParen,
 
     #[token(")")]
-    RIGHT_PAREN,
+    RightParen,
 
     #[token("{")]
-    LEFT_BRACE,
+    LeftBrace,
 
     #[token("}")]
-    RIGHT_BRACE,
+    RightBrace,
 
     #[token("[")]
-    LEFT_BRACKET,
+    LeftBracket,
 
     #[token("]")]
-    RIGHT_BRACKET,
+    RightBracket,
 
     #[token(",")]
     COMMA,
@@ -58,52 +58,50 @@ pub enum TokenType {
     AT, // dot product
 
     #[token("**")]
-    STAR_STAR, //  exponentiation
+    StarStar, //  exponentiation
 
     // One or two character tokens.
     #[token("!")]
     BANG,
 
     #[token("!=")]
-    BANG_EQUAL,
+    BangEqual,
 
     #[token("=")]
     EQUAL,
 
     #[token("==")]
-    EQUAL_EQUAL,
+    EqualEqual,
 
     #[token(">")]
     GREATER,
 
     #[token(">=")]
-    GREATER_EQUAL,
+    GreaterEqual,
 
     #[token("<")]
     LESS,
 
     #[token("<=")]
-    LESS_EQUAL,
+    LessEqual,
 
     #[token("+=")]
-    PLUS_EQUAL, // +=
+    PlusEqual, // +=
 
     #[token("-=")]
-    MINUS_EQUAL, // -=
+    MinusEqual, // -=
 
     #[token("*=")]
-    STAR_EQUAL, // *=
+    StarEqual, // *=
 
     #[token("/=")]
-    SLASH_EQUAL, // /=
+    SlashEqual, // /=
 
     #[regex(r#"[a-zA-Z_][a-zA-Z0-9_]*"#)]
     Identifier,
 
     #[regex(r"(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?", |lex| lex.slice().parse::<f64>().unwrap())]
     Number(f64),
-
-    // seperate for int and float
 
     // #[regex(r"-?(?:0|[1-9]\d*)", |lex| lex.slice().parse::<i64>().unwrap())]
     // IntNumber(i64),
@@ -121,8 +119,6 @@ pub enum TokenType {
     #[token("and")]
     AND,
 
-    // #[token("class")]
-    // CLASS,
     #[token("else")]
     ELSE,
 
@@ -147,11 +143,6 @@ pub enum TokenType {
     #[token("return")]
     RETURN,
 
-    // #[token("super")]
-    // SUPER,
-
-    // #[token("this")]
-    // THIS,
     #[token("let")]
     LET,
 
@@ -281,15 +272,15 @@ mod tests {
         assert_eq!(lexer.next(), Some(Ok(TokenType::Number(4.))));
         assert_eq!(lexer.next(), Some(Ok(TokenType::SEMICOLON)));
         assert_eq!(lexer.next(), Some(Ok(TokenType::Identifier)));
-        assert_eq!(lexer.next(), Some(Ok(TokenType::PLUS_EQUAL)));
+        assert_eq!(lexer.next(), Some(Ok(TokenType::PlusEqual)));
         assert_eq!(lexer.next(), Some(Ok(TokenType::Number(6.))));
         assert_eq!(lexer.next(), Some(Ok(TokenType::SEMICOLON)));
         assert_eq!(lexer.next(), Some(Ok(TokenType::PRINT)));
-        assert_eq!(lexer.next(), Some(Ok(TokenType::LEFT_PAREN)));
+        assert_eq!(lexer.next(), Some(Ok(TokenType::LeftParen)));
         assert_eq!(lexer.next(), Some(Ok(TokenType::Identifier)));
-        assert_eq!(lexer.next(), Some(Ok(TokenType::EQUAL_EQUAL)));
+        assert_eq!(lexer.next(), Some(Ok(TokenType::EqualEqual)));
         assert_eq!(lexer.next(), Some(Ok(TokenType::Number(10.))));
-        assert_eq!(lexer.next(), Some(Ok(TokenType::RIGHT_PAREN)));
+        assert_eq!(lexer.next(), Some(Ok(TokenType::RightParen)));
     }
 
     #[test]

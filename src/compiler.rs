@@ -11,6 +11,25 @@ pub struct Compiler {
     interner: Interner,
 }
 
+// write a macro that can take single of multiple opcode and write it to the chunk, ( without mentioning self.chunk )
+macro_rules! write_op {
+    ($chunk:expr, $($op:expr),*) => {
+        $( $chunk.write(VectorType::Code($op)))*
+    };
+}
+
+macro_rules! add_con {
+    ($chunk:expr, $constant:expr) => {
+        $chunk.add_constant($constant)
+    };
+}
+
+macro_rules! write_cons {
+    ($chunk:expr, $code:expr) => {
+        $chunk.write(VectorType::Constant($code))
+    };
+}
+
 impl Compiler {
     pub fn new() -> Self {
         Self {
@@ -20,44 +39,39 @@ impl Compiler {
     }
 
     pub fn compile(&mut self, ast: Vec<ASTNode>) -> (Chunk, Interner) {
-        // NOTE: stmts or exprs or whatever
         ast.iter().for_each(|stmt| self.visit(stmt.clone()));
 
         // add return
         self.chunk.write(VectorType::Code(OpCode::OpReturn));
 
-        return (self.chunk.clone(), self.interner.clone());
+        (self.chunk.clone(), self.interner.clone())
     }
 
     fn visit(&mut self, node: ASTNode) {
         match node {
             ASTNode::Number(n) => {
-                self.chunk.write(VectorType::Code(OpCode::OpConstant));
-
-                let constant = self.chunk.add_constant(ValueType::Tensor(Tensor::new(n)));
-                self.chunk.write(VectorType::Constant(constant));
+                write_op!(self.chunk, OpCode::OpConstant);
+                add_con!(self.chunk, ValueType::Tensor(Tensor::from(n)));
+                write_cons!(self.chunk, self.chunk.constants.len() - 1);
             }
             ASTNode::Boolean(b) => {
-                if b {
-                    self.chunk.write(VectorType::Code(OpCode::OpTrue));
-                } else {
-                    self.chunk.write(VectorType::Code(OpCode::OpFalse));
-                }
+                write_op!(self.chunk, if b { OpCode::OpTrue } else { OpCode::OpFalse })
             }
+
             ASTNode::String(s) => {
-                self.chunk.write(VectorType::Code(OpCode::OpConstant));
-                let constant = self
-                    .chunk
-                    .add_constant(ValueType::String(self.interner.intern_string(s)));
-                self.chunk.write(VectorType::Constant(constant));
+                write_op!(self.chunk, OpCode::OpConstant);
+                add_con!(
+                    self.chunk,
+                    ValueType::String(self.interner.intern_string(s))
+                );
+                write_cons!(self.chunk, self.chunk.constants.len() - 1);
             }
             ASTNode::Identifier(iden) => {
-                self.chunk.write(VectorType::Code(OpCode::OpGetGlobal));
-
+                write_op!(self.chunk, OpCode::OpGetGlobal);
                 let global = self
                     .chunk
                     .add_constant(ValueType::Identifier(self.interner.intern_string(iden)));
-                self.chunk.write(VectorType::Constant(global));
+                write_cons!(self.chunk, global);
             }
             ASTNode::Op(op, vec) => {
                 for node in vec {
@@ -65,54 +79,33 @@ impl Compiler {
                 }
 
                 match op {
-                    Ops::BinaryOp(BinaryOp::Add) => {
-                        self.chunk.write(VectorType::Code(OpCode::OpAdd))
-                    }
-                    Ops::BinaryOp(BinaryOp::Sub) => {
-                        self.chunk.write(VectorType::Code(OpCode::OpSubtract))
-                    }
-                    Ops::BinaryOp(BinaryOp::Mul) => {
-                        self.chunk.write(VectorType::Code(OpCode::OpMultiply))
-                    }
+                    Ops::BinaryOp(BinaryOp::Add) => write_op!(self.chunk, OpCode::OpAdd),
+                    Ops::BinaryOp(BinaryOp::Sub) => write_op!(self.chunk, OpCode::OpSubtract),
+                    Ops::BinaryOp(BinaryOp::Mul) => write_op!(self.chunk, OpCode::OpMultiply),
                     // @ - dot product - TODO: need to implement
-                    Ops::BinaryOp(BinaryOp::At) => {
-                        self.chunk.write(VectorType::Code(OpCode::OpMultiply))
-                    }
-                    Ops::BinaryOp(BinaryOp::Div) => {
-                        self.chunk.write(VectorType::Code(OpCode::OpDivide))
-                    }
-                    Ops::BinaryOp(BinaryOp::Eq) => {
-                        self.chunk.write(VectorType::Code(OpCode::OpEqualEqual))
-                    }
+                    Ops::BinaryOp(BinaryOp::At) => write_op!(self.chunk, OpCode::OpMultiply),
+                    Ops::BinaryOp(BinaryOp::Div) => write_op!(self.chunk, OpCode::OpDivide),
+                    Ops::BinaryOp(BinaryOp::Eq) => write_op!(self.chunk, OpCode::OpEqualEqual),
                     Ops::BinaryOp(BinaryOp::Ne) => {
-                        self.chunk.write(VectorType::Code(OpCode::OpEqualEqual));
-                        self.chunk.write(VectorType::Code(OpCode::OpNot))
+                        write_op!(self.chunk, OpCode::OpEqualEqual);
+                        write_op!(self.chunk, OpCode::OpNot)
                     }
-                    Ops::BinaryOp(BinaryOp::Lt) => {
-                        self.chunk.write(VectorType::Code(OpCode::OpLess))
-                    }
+                    Ops::BinaryOp(BinaryOp::Lt) => write_op!(self.chunk, OpCode::OpLess),
                     Ops::BinaryOp(BinaryOp::Le) => {
-                        self.chunk.write(VectorType::Code(OpCode::OpGreater));
-                        self.chunk.write(VectorType::Code(OpCode::OpNot))
+                        write_op!(self.chunk, OpCode::OpGreater);
+                        write_op!(self.chunk, OpCode::OpNot)
                     }
-                    Ops::BinaryOp(BinaryOp::Gt) => {
-                        self.chunk.write(VectorType::Code(OpCode::OpGreater))
-                    }
+                    Ops::BinaryOp(BinaryOp::Gt) => write_op!(self.chunk, OpCode::OpGreater),
                     Ops::BinaryOp(BinaryOp::Ge) => {
-                        self.chunk.write(VectorType::Code(OpCode::OpLess));
-                        self.chunk.write(VectorType::Code(OpCode::OpNot))
+                        write_op!(self.chunk, OpCode::OpLess);
+                        write_op!(self.chunk, OpCode::OpNot)
                     }
+                    Ops::UnaryOp(UnaryOp::Negate) => write_op!(self.chunk, OpCode::OpNegate),
 
-                    Ops::UnaryOp(UnaryOp::Negate) => {
-                        self.chunk.write(VectorType::Code(OpCode::OpNegate))
-                    }
-
-                    Ops::PostfixOp(PostfixOp::StarStar) => {
-                        self.chunk.write(VectorType::Code(OpCode::OpPower))
-                    }
+                    Ops::PostfixOp(PostfixOp::StarStar) => write_op!(self.chunk, OpCode::OpPower),
                     Ops::PostfixOp(PostfixOp::Call) => {
-                        println!("Call");
-                        self.chunk.write(VectorType::Code(OpCode::OpCall));
+                        // self.chunk.write(VectorType::Code(OpCode::OpCall));
+                        write_op!(self.chunk, OpCode::OpCall);
                         self.chunk
                             .write(VectorType::Constant(self.chunk.constants.len() - 1));
                         // TODO: need for testing for this - a.relu(c.relu()), a.relu().relu()
@@ -123,49 +116,36 @@ impl Compiler {
             ASTNode::Print(expr) => {
                 assert!(expr.len() == 1);
                 self.visit(expr[0].clone());
-                self.chunk.write(VectorType::Code(OpCode::OpPrint));
+                write_op!(self.chunk, OpCode::OpPrint);
             }
             ASTNode::Let(iden, expr) => {
                 assert!(expr.len() == 1);
 
-                let global = self
-                    .chunk
-                    .add_constant(ValueType::Identifier(self.interner.intern_string(iden)));
-                // self.chunk.write(VectorType::Constant(global));
-
+                let global = add_con!(
+                    self.chunk,
+                    ValueType::Identifier(self.interner.intern_string(iden))
+                );
                 self.visit(expr[0].clone());
-
-                self.chunk.write(VectorType::Code(OpCode::OpDefineGlobal));
-                self.chunk.write(VectorType::Constant(global));
+                write_op!(self.chunk, OpCode::OpDefineGlobal);
+                write_cons!(self.chunk, global);
             }
             ASTNode::Assign(iden, expr) => {
                 assert!(expr.len() == 1);
 
-                let global = self
-                    .chunk
-                    .add_constant(ValueType::Identifier(self.interner.intern_string(iden)));
-                // self.chunk.write(VectorType::Constant(global));
-
+                let global = add_con!(
+                    self.chunk,
+                    ValueType::Identifier(self.interner.intern_string(iden))
+                );
                 self.visit(expr[0].clone());
-
-                self.chunk.write(VectorType::Code(OpCode::OpSetGlobal));
-                self.chunk.write(VectorType::Constant(global));
+                write_op!(self.chunk, OpCode::OpSetGlobal);
+                write_cons!(self.chunk, global);
             }
             ASTNode::Callee(iden, _) => {
-                println!("Callee");
-                let global = self
-                    .chunk
-                    .add_constant(ValueType::Identifier(self.interner.intern_string(iden)));
-                self.chunk.write(VectorType::Constant(global));
-
-                // TODO: need to implement args
-
-                // for arg in args {
-                //     self.visit(arg.clone());
-                // }
-
-                // self.chunk.write(VectorType::Code(OpCode::OpCall));
-                // self.chunk.write(VectorType::Constant(args.len()));
+                let global = add_con!(
+                    self.chunk,
+                    ValueType::Identifier(self.interner.intern_string(iden))
+                );
+                write_cons!(self.chunk, global);
             }
         }
     }

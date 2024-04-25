@@ -19,11 +19,10 @@ let g = f / 2.0;
 g += 10.0 / f;
 
 
-print(g) // prints 24.7041, the outcome of this forward pass
-
-let x = 100;
-x = x.relu().relu();
-
+print(g); // prints 24.7041, the outcome of this forward pass
+g.backward();
+print(a.grad()); // prints 138.8338, i.e. the numerical value of dg/da
+print(b.grad()); // prints 138.8338, i.e. the numerical value of dg/da
 
 // f@g
 

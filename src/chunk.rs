@@ -1,6 +1,7 @@
 use crate::value::ValueType;
 
 #[derive(Debug, Clone, Copy)]
+#[repr(u8)]
 pub enum OpCode {
     OpConstant,
     OpNil,
@@ -25,6 +26,40 @@ pub enum OpCode {
 
     OpCall,
 }
+
+#[derive(Debug, Clone, Copy)]
+pub enum VectorType {
+    Constant(usize),
+    Code(OpCode),
+}
+
+#[derive(Debug, Clone)]
+pub struct Chunk {
+    pub code: Vec<VectorType>,
+    pub constants: Vec<ValueType>,
+}
+
+impl Chunk {
+    pub fn new() -> Self {
+        Self {
+            code: Vec::new(),
+            constants: Vec::new(),
+        }
+    }
+
+    pub fn write(&mut self, byte: VectorType) {
+        self.code.push(byte);
+    }
+
+    pub fn add_constant(&mut self, value: ValueType) -> usize {
+        self.constants.push(value);
+        self.constants.len() - 1 // return the index of the constant
+    }
+}
+
+////////////////////////
+/// Display impls
+////////////////////////
 
 impl std::fmt::Display for OpCode {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
@@ -54,12 +89,6 @@ impl std::fmt::Display for OpCode {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
-pub enum VectorType {
-    Constant(usize),
-    Code(OpCode),
-}
-
 impl std::fmt::Display for VectorType {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
@@ -67,33 +96,4 @@ impl std::fmt::Display for VectorType {
             VectorType::Code(op) => write!(f, "{}", op),
         }
     }
-}
-
-#[derive(Debug, Clone)]
-pub struct Chunk {
-    pub code: Vec<VectorType>,
-    pub constants: Vec<ValueType>,
-}
-
-impl Chunk {
-    pub fn new() -> Self {
-        Self {
-            code: Vec::new(),
-            constants: Vec::new(),
-        }
-    }
-
-    pub fn write(&mut self, byte: VectorType) {
-        self.code.push(byte);
-    }
-
-    pub fn add_constant(&mut self, value: ValueType) -> usize {
-        self.constants.push(value);
-        self.constants.len() - 1 // return the index of the constant
-    }
-
-    // pub fn free(&mut self) {
-    //    self.code.clear();
-    //    self.constants.clear();
-    // }
 }

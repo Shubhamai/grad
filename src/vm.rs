@@ -1,9 +1,10 @@
-use std::collections::HashMap;
+use std::{any::Any, clone, collections::HashMap};
+use thiserror::Error;
 
 use crate::{
     chunk::{self, Chunk, VectorType},
-    debug,
     interner::{Interner, StringObjIdx},
+    tensor::Tensor,
     value::ValueType,
 };
 
@@ -25,12 +26,19 @@ pub(crate) struct VM {
     globals: HashMap<StringObjIdx, ValueType>,
 }
 
-#[derive(Debug, PartialEq)]
-pub enum InterpretResult {
-    InterpretOk(Vec<ValueType>),
-    InterpretCompileError,
-    InterpretRuntimeError,
+#[derive(Debug, PartialEq, Error)]
+pub enum Result {
+    #[error("Ok")]
+    Ok(Vec<ValueType>),
+
+    #[error("Compile error : {0}")]
+    CompileErr(String),
+
+    #[error("Runtime error : {0}")]
+    RuntimeErr(String),
 }
+
+// write code to shrink chunk::VectorType::Code(chunk::OpCode::OpReturn) to Code(OpReturn)
 
 impl VM {
     // pub(crate) fn init(chunk: Chunk) -> VM {
@@ -45,170 +53,143 @@ impl VM {
         }
     }
 
-    pub fn run(&mut self) -> InterpretResult {
+    pub fn run(&mut self) -> Result {
         let mut print_outputs = Vec::new();
 
-        loop {
-            // debug
-            // for i in 0..self.stack_top {
-            //     print!("{} ", self.stack[i]);
-            // }
-            // let debug = debug::Debug::new(&format!("{}", self.ip), self.chunk.clone());
-            // debug.disassemble_instruction(self.ip);
+        macro_rules! push {
+            ($value:expr) => {
+                self.push($value)
+            };
+        }
 
+        macro_rules! pop {
+            () => {
+                self.pop()
+            };
+        }
+
+        /// Macro to generate the opcode enum `opcode!(OpReturn)` to `chunk::VectorType::Code(chunk::OpCode::OpReturn)`
+        macro_rules! opcode {
+            ($op:ident) => {
+                chunk::VectorType::Code(chunk::OpCode::$op)
+            };
+        }
+
+        /// Macro to get the constant from the chunk
+        macro_rules! get_constant {
+            ($index:expr) => {
+                match $index {
+                    chunk::VectorType::Constant(idx) => self.read_constant(idx as usize),
+                    _ => {
+                        return Result::RuntimeErr("Invalid constant index".to_string());
+                    }
+                }
+            };
+        }
+
+        loop {
             let instruction = self.read_byte();
 
             match instruction {
-                chunk::VectorType::Code(chunk::OpCode::OpReturn) => {
-                    // println!("{}", self.pop());
-                    return InterpretResult::InterpretOk(print_outputs);
+                opcode!(OpReturn) => {
+                    return Result::Ok(print_outputs);
                 }
-                chunk::VectorType::Code(chunk::OpCode::OpAdd) => {
+                opcode!(OpAdd) => {
                     if let ValueType::String(_) = self.peek(0) {
                         self.concatenate();
                     } else {
-                        let b = self.pop();
-                        let a = self.pop();
-                        self.push(a + b);
+                        let b = pop!();
+                        let a = pop!();
+                        push!(a + b);
                     }
                 }
-                chunk::VectorType::Code(chunk::OpCode::OpSubtract) => {
-                    let b = self.pop();
-                    let a = self.pop();
-                    self.push(a - b);
+                opcode!(OpSubtract) => {
+                    let b = pop!();
+                    let a = pop!();
+                    push!(a - b);
                 }
-                chunk::VectorType::Code(chunk::OpCode::OpMultiply) => {
-                    let b = self.pop();
-                    let a = self.pop();
-                    self.push(a * b);
+                opcode!(OpMultiply) => {
+                    let b = pop!();
+                    let a = pop!();
+                    push!(a * b);
                 }
-                chunk::VectorType::Code(chunk::OpCode::OpDivide) => {
-                    let b = self.pop();
-                    let a = self.pop();
-                    self.push(a / b);
+                opcode!(OpDivide) => {
+                    let b = pop!();
+                    let a = pop!();
+                    push!(a / b);
                 }
-                chunk::VectorType::Code(chunk::OpCode::OpPower) => {
-                    let b = self.pop();
-                    let a = self.pop();
-                    match (a, b) {
-                        (ValueType::Tensor(a), ValueType::Tensor(b)) => {
-                            self.push(ValueType::Tensor(a.powf(b)));
-                        }
-                        _ => {
-                            println!("Operands must be numbers.");
-                            return InterpretResult::InterpretRuntimeError;
-                        }
-                    }
+                opcode!(OpPower) => {
+                    let b = pop!();
+                    let a = pop!();
+                    push!(a.pow(&b));
                 }
-                chunk::VectorType::Code(chunk::OpCode::OpNegate) => {
-                    let value = self.pop();
-                    self.push(-value);
+                opcode!(OpNegate) => {
+                    let value = pop!();
+                    push!(-value);
                 }
-                chunk::VectorType::Code(chunk::OpCode::OpNil) => {
-                    self.push(ValueType::Nil);
+                opcode!(OpNil) => push!(ValueType::Nil),
+                opcode!(OpTrue) => push!(ValueType::Boolean(true)),
+                opcode!(OpFalse) => push!(ValueType::Boolean(false)),
+                opcode!(OpNot) => {
+                    let value = pop!();
+                    push!(!value)
                 }
-                chunk::VectorType::Code(chunk::OpCode::OpTrue) => {
-                    self.push(ValueType::Boolean(true));
+                opcode!(OpEqualEqual) => {
+                    let b = pop!();
+                    let a = pop!();
+                    push!(ValueType::Boolean(a == b));
                 }
-                chunk::VectorType::Code(chunk::OpCode::OpFalse) => {
-                    self.push(ValueType::Boolean(false));
+                opcode!(OpGreater) => {
+                    let b = pop!();
+                    let a = pop!();
+                    push!(ValueType::Boolean(a > b));
                 }
-                chunk::VectorType::Code(chunk::OpCode::OpNot) => {
-                    let value = self.pop();
-                    self.push(!value);
+                opcode!(OpLess) => {
+                    let b = pop!();
+                    let a = pop!();
+                    push!(ValueType::Boolean(a < b));
                 }
-                chunk::VectorType::Code(chunk::OpCode::OpEqualEqual) => {
-                    let b = self.pop();
-                    let a = self.pop();
-                    self.push(ValueType::Boolean(a == b));
+                opcode!(OpPrint) => {
+                    let value = pop!();
+                    print_outputs.push(value.clone());
+                    println!("{}", value)
                 }
-                chunk::VectorType::Code(chunk::OpCode::OpGreater) => {
-                    let b = self.pop();
-                    let a = self.pop();
-                    self.push(ValueType::Boolean(a > b));
+                opcode!(OpPop) => {
+                    pop!();
                 }
-                chunk::VectorType::Code(chunk::OpCode::OpLess) => {
-                    let b = self.pop();
-                    let a = self.pop();
-                    self.push(ValueType::Boolean(a < b));
+                opcode!(OpConstant) => {
+                    let constant = get_constant!(self.read_byte());
+                    push!(constant);
                 }
-                chunk::VectorType::Code(chunk::OpCode::OpPrint) => {
-                    let value = self.pop();
-                    print_outputs.push(value);
-                    println!("{}", value);
-                }
-                chunk::VectorType::Code(chunk::OpCode::OpPop) => {
-                    self.pop();
-                }
-                chunk::VectorType::Code(chunk::OpCode::OpConstant) => {
-                    let index = self.read_byte();
-
-                    match index {
-                        chunk::VectorType::Constant(idx) => {
-                            let constant = self.read_constant(idx as usize);
-                            self.push(constant);
-                        }
-                        _ => {
-                            println!("op constant: Invalid constant index : {:?}", index);
-                            return InterpretResult::InterpretRuntimeError;
-                        }
-                    }
-                }
-                chunk::VectorType::Code(chunk::OpCode::OpDefineGlobal) => {
-                    let index = self.read_byte();
-                    let constant = match index {
-                        chunk::VectorType::Constant(idx) => self.read_constant(idx as usize),
-                        _ => {
-                            println!("define global: Invalid constant index : {:?}", index);
-                            return InterpretResult::InterpretRuntimeError;
-                        }
-                    };
-
+                opcode!(OpDefineGlobal) => {
+                    let constant = get_constant!(self.read_byte());
                     let value = self.peek(0);
 
                     if let ValueType::Identifier(idx) = constant {
                         self.globals.insert(idx, value);
                     }
 
-                    self.pop();
+                    pop!();
                 }
-                chunk::VectorType::Code(chunk::OpCode::OpGetGlobal) => {
-                    let index = self.read_byte();
-                    let constant = match index {
-                        chunk::VectorType::Constant(idx) => self.read_constant(idx as usize),
-                        _ => {
-                            println!("get global: Invalid constant index : {:?}", index);
-                            return InterpretResult::InterpretRuntimeError;
-                        }
-                    };
+                opcode!(OpGetGlobal) => {
+                    let constant = get_constant!(self.read_byte());
                     match constant {
                         ValueType::Identifier(idx) => {
                             let value = self.globals.get(&idx);
-                            match value {
-                                Some(value) => {
-                                    self.push(*value);
-                                }
-                                None => {
-                                    println!("Undefined variable");
-                                    return InterpretResult::InterpretRuntimeError;
-                                }
+                            if let Some(value) = value {
+                                push!(value.clone());
+                            } else {
+                                return Result::RuntimeErr("Undefined global variable".to_string());
                             }
                         }
                         _ => {
-                            println!("Invalid global variable");
-                            return InterpretResult::InterpretRuntimeError;
+                            return Result::RuntimeErr("Invalid global variable".to_string());
                         }
                     }
                 }
-                chunk::VectorType::Code(chunk::OpCode::OpSetGlobal) => {
+                opcode!(OpSetGlobal) => {
                     let index = self.read_byte();
-                    let constant = match index {
-                        chunk::VectorType::Constant(idx) => self.read_constant(idx as usize),
-                        _ => {
-                            println!("set global: Invalid constant index : {:?}", index);
-                            return InterpretResult::InterpretRuntimeError;
-                        }
-                    };
+                    let constant = get_constant!(index);
 
                     match constant {
                         ValueType::Identifier(idx) => {
@@ -217,46 +198,36 @@ impl VM {
                             // TODO - only set the value if it exists
                         }
                         _ => {
-                            println!("Invalid global variable");
-                            return InterpretResult::InterpretRuntimeError;
+                            return Result::RuntimeErr("Invalid global variable".to_string());
                         }
                     }
                 }
-                chunk::VectorType::Code(chunk::OpCode::OpCall) => {
-                    // relu
+                opcode!(OpCall) => {
                     let callee = self.read_byte();
+                    let caller = pop!();
 
-                    // a ?
-                    let caller = self.pop();
-
-                    let str_idx = match callee {
-                        VectorType::Constant(idx) => match self.read_constant(idx as usize) {
-                            ValueType::Identifier(idx) => idx,
-                            _ => {
-                                println!("Invalid function");
-                                return InterpretResult::InterpretRuntimeError;
-                            }
-                        },
+                    let constant = get_constant!(callee);
+                    let str_idx = match constant {
+                        ValueType::Identifier(idx) => idx,
                         _ => {
-                            println!("Invalid function");
-                            return InterpretResult::InterpretRuntimeError;
+                            return Result::RuntimeErr("Invalid function".to_string());
                         }
                     };
                     let calle_str = self.interner.lookup(str_idx);
 
-                    match calle_str {
-                        "relu" => match caller {
-                            ValueType::Tensor(a) => {
-                                self.push(ValueType::Tensor(a.relu()));
-                            }
-                            _ => {
-                                println!("Invalid function");
-                                return InterpretResult::InterpretRuntimeError;
-                            }
-                        },
+                    let tensor = match caller {
+                        ValueType::Tensor(tensor) => tensor,
                         _ => {
-                            println!("Undefined function");
-                            return InterpretResult::InterpretRuntimeError;
+                            return Result::RuntimeErr("Invalid function".to_string());
+                        }
+                    };
+
+                    match calle_str {
+                        "relu" => push!(ValueType::Tensor(Tensor::from(tensor.relu()))),
+                        "backward" => tensor.backward(),
+                        "grad" => push!(ValueType::Tensor(Tensor::from(tensor.gradient()))),
+                        _ => {
+                            return Result::RuntimeErr("Undefined function. Currently only supports relu, backward and grad".to_string());
                         }
                     }
                 }
@@ -265,7 +236,7 @@ impl VM {
         }
     }
 
-    // The READ_BYTE macro reads the byte currently pointed at by ip and then advances the instruction pointer - book
+    // Reads the byte currently pointed at by ip and then advances the instruction pointer - book
     fn read_byte(&mut self) -> VectorType {
         let byte = self.chunk.code[self.ip];
         self.ip += 1;
@@ -273,7 +244,7 @@ impl VM {
     }
 
     fn read_constant(&mut self, index: usize) -> ValueType {
-        self.chunk.constants[index]
+        self.chunk.constants[index].clone()
     }
 
     fn push(&mut self, value: ValueType) {
@@ -283,11 +254,11 @@ impl VM {
 
     fn pop(&mut self) -> ValueType {
         self.stack_top -= 1;
-        self.stack[self.stack_top]
+        self.stack[self.stack_top].clone()
     }
 
     fn peek(&self, distance: usize) -> ValueType {
-        self.stack[self.stack_top - 1 - distance]
+        self.stack[self.stack_top - 1 - distance].clone()
     }
 
     fn concatenate(&mut self) {

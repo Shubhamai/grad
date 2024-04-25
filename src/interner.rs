@@ -12,7 +12,7 @@ pub struct Interner {
 
 impl Interner {
     pub fn intern_string(&mut self, name: String) -> StringObjIdx {
-        if let Some(&idx ) = self.map.get(&name) {
+        if let Some(&idx) = self.map.get(&name) {
             return idx;
         }
         let idx = self.map.len() as StringObjIdx;

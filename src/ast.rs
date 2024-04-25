@@ -1,6 +1,9 @@
 // Pratt parser for parsing expressions from https://matklad.github.io/2020/04/13/simple-but-powerful-pratt-parsing.html
 
-use crate::scanner::{Lexer, TokenType};
+use crate::{
+    scanner::{Lexer, TokenType},
+    vm::{self},
+};
 use std::fmt;
 
 #[derive(Debug, Clone)]
@@ -14,82 +17,6 @@ pub enum ASTNode {
     Let(String, Vec<ASTNode>),
     Assign(String, Vec<ASTNode>),
     Print(Vec<ASTNode>),
-}
-
-pub struct Parser<'a> {
-    lexer: &'a mut Lexer,
-}
-
-impl<'a> Parser<'a> {
-    pub fn new(lexer: &mut Lexer) -> Parser {
-        Parser { lexer }
-    }
-
-    pub fn parse(&mut self) -> Vec<ASTNode> {
-        let mut statements = vec![];
-
-        while self.lexer.peek().token_type != TokenType::EOF {
-            // print statement; print(1);
-            if self.lexer.peek().token_type == TokenType::PRINT {
-                self.lexer.next();
-                assert_eq!(self.lexer.next().token_type, TokenType::LEFT_PAREN);
-                let expr = expr_bp(self.lexer, 0);
-                assert_eq!(self.lexer.next().token_type, TokenType::RIGHT_PAREN);
-
-                statements.push(ASTNode::Print(vec![expr]));
-            }
-            // let declaration; let a= 3;
-            else if self.lexer.peek().token_type == TokenType::LET {
-                self.lexer.next();
-                let identifier = self.lexer.next().lexeme;
-                assert_eq!(self.lexer.next().token_type, TokenType::EQUAL);
-                let expr = expr_bp(self.lexer, 0);
-                statements.push(ASTNode::Let(identifier, vec![expr]));
-            }
-            // assignment; a = 3, a+=3, a-=4, a*=5, a/=6
-            else if self.lexer.peek_n_type(2)
-                == Vec::from([TokenType::Identifier, TokenType::EQUAL])
-                || self.lexer.peek_n_type(2)
-                    == Vec::from([TokenType::Identifier, TokenType::PLUS_EQUAL])
-                || self.lexer.peek_n_type(2)
-                    == Vec::from([TokenType::Identifier, TokenType::MINUS_EQUAL])
-                || self.lexer.peek_n_type(2)
-                    == Vec::from([TokenType::Identifier, TokenType::STAR_EQUAL])
-                || self.lexer.peek_n_type(2)
-                    == Vec::from([TokenType::Identifier, TokenType::SLASH_EQUAL])
-            {
-                let identifier = self.lexer.next().lexeme;
-                let op = self.lexer.next().token_type;
-
-                let expr = if op == TokenType::EQUAL {
-                    expr_bp(self.lexer, 0)
-                } else {
-                    let expr = expr_bp(self.lexer, 0);
-                    let op = match op {
-                        TokenType::PLUS_EQUAL => Ops::BinaryOp(BinaryOp::Add),
-                        TokenType::MINUS_EQUAL => Ops::BinaryOp(BinaryOp::Sub),
-                        TokenType::STAR_EQUAL => Ops::BinaryOp(BinaryOp::Mul),
-                        TokenType::SLASH_EQUAL => Ops::BinaryOp(BinaryOp::Div),
-                        _ => panic!("bad token: {:?}", op),
-                    };
-                    ASTNode::Op(op, vec![ASTNode::Identifier(identifier.clone()), expr])
-                };
-
-                statements.push(ASTNode::Assign(identifier, vec![expr]));
-            }
-            // expression
-            else {
-                let expr = expr_bp(self.lexer, 0);
-                statements.push(expr);
-            }
-
-            if self.lexer.peek().token_type == TokenType::SEMICOLON {
-                self.lexer.next();
-            }
-        }
-
-        statements
-    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -129,69 +56,107 @@ pub enum Ops {
     PostfixOp(PostfixOp),
 }
 
-impl fmt::Display for Ops {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Ops::BinaryOp(BinaryOp::Add) => write!(f, "+"),
-            Ops::BinaryOp(BinaryOp::Sub) => write!(f, "-"),
-            Ops::BinaryOp(BinaryOp::Mul) => write!(f, "*"),
-            Ops::BinaryOp(BinaryOp::Div) => write!(f, "/"),
-            Ops::BinaryOp(BinaryOp::At) => write!(f, "@"),
-            Ops::BinaryOp(BinaryOp::Eq) => write!(f, "=="),
-            Ops::BinaryOp(BinaryOp::Ne) => write!(f, "!="),
-            Ops::BinaryOp(BinaryOp::Lt) => write!(f, "<"),
-            Ops::BinaryOp(BinaryOp::Le) => write!(f, "<="),
-            Ops::BinaryOp(BinaryOp::Gt) => write!(f, ">"),
-            Ops::BinaryOp(BinaryOp::Ge) => write!(f, ">="),
+//////////////////////////////
+/// Parser
+//////////////////////////////
 
-            Ops::UnaryOp(UnaryOp::Negate) => write!(f, "-"),
-            Ops::UnaryOp(UnaryOp::Not) => write!(f, "!"),
+pub struct Parser<'a> {
+    lexer: &'a mut Lexer,
+}
 
-            Ops::PostfixOp(PostfixOp::Index) => write!(f, "["),
-            Ops::PostfixOp(PostfixOp::Call) => write!(f, "."),
-            Ops::PostfixOp(PostfixOp::StarStar) => write!(f, "**"),
-            // Ops::PostfixOp(PostfixOp::Args) => write!(f, ","),
+impl<'a> Parser<'a> {
+    pub fn new(lexer: &mut Lexer) -> Parser {
+        Parser { lexer }
+    }
+    pub fn parse(&mut self) -> Vec<ASTNode> {
+        let mut statements = vec![];
+
+        let mut all_errors = vec![];
+
+        while self.lexer.peek().token_type != TokenType::EOF {
+            let statement = match self.lexer.peek().token_type {
+                TokenType::PRINT => self.parse_print(),
+                TokenType::LET => self.parse_let(),
+
+                // contains equal pr +=, -=, *=, /=
+                TokenType::Identifier
+                    if self.lexer.peek_n_type(2).contains(&TokenType::EQUAL)
+                        | self.lexer.peek_n_type(2).contains(&TokenType::PlusEqual)
+                        || self.lexer.peek_n_type(2).contains(&TokenType::MinusEqual)
+                        || self.lexer.peek_n_type(2).contains(&TokenType::StarEqual)
+                        || self.lexer.peek_n_type(2).contains(&TokenType::SlashEqual) =>
+                {
+                    // self.parse_assign()
+                    match self.parse_assign() {
+                        Ok(ast) => ast,
+                        Err(e) => {
+                            all_errors.push(e);
+                            self.lexer.next();
+                            continue;
+                        }
+                    }
+                }
+                TokenType::SEMICOLON => {
+                    self.lexer.next();
+                    continue;
+                }
+                _ => self.parse_expression(),
+            };
+            statements.push(statement);
         }
+
+        statements
+    }
+
+    fn parse_print(&mut self) -> ASTNode {
+        self.lexer.next();
+        assert_eq!(self.lexer.next().token_type, TokenType::LeftParen);
+        let expr = self.parse_expression();
+        assert_eq!(self.lexer.next().token_type, TokenType::RightParen);
+        ASTNode::Print(vec![expr])
+    }
+
+    fn parse_let(&mut self) -> ASTNode {
+        self.lexer.next();
+        let identifier = self.lexer.next().lexeme;
+        assert_eq!(self.lexer.next().token_type, TokenType::EQUAL);
+        let expr = self.parse_expression();
+        ASTNode::Let(identifier, vec![expr])
+    }
+
+    fn parse_assign(&mut self) -> Result<ASTNode, vm::Result> {
+        let identifier = self.lexer.next().lexeme;
+        let op_lexer = self.lexer.next();
+        let op = op_lexer.token_type;
+        let expr = self.parse_expression();
+        let expr = if op == TokenType::EQUAL {
+            expr
+        } else {
+            let op = match op {
+                TokenType::PlusEqual => Ops::BinaryOp(BinaryOp::Add),
+                TokenType::MinusEqual => Ops::BinaryOp(BinaryOp::Sub),
+                TokenType::StarEqual => Ops::BinaryOp(BinaryOp::Mul),
+                TokenType::SlashEqual => Ops::BinaryOp(BinaryOp::Div),
+                _ => {
+                    return Err(vm::Result::CompileErr(format!(
+                        "Invalid operator: {:?} on line: {:?}",
+                        op, op_lexer.span
+                    )))
+                }
+            };
+            ASTNode::Op(op, vec![ASTNode::Identifier(identifier.clone()), expr])
+        };
+        Ok(ASTNode::Assign(identifier, vec![expr]))
+    }
+
+    fn parse_expression(&mut self) -> ASTNode {
+        expr_bp(self.lexer, 0)
     }
 }
 
-impl fmt::Display for ASTNode {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            ASTNode::Number(i) => write!(f, "{}", i),
-            ASTNode::Identifier(s) => write!(f, "{}", s),
-            ASTNode::Boolean(b) => write!(f, "{}", b),
-            ASTNode::String(s) => write!(f, "{}", s),
-            ASTNode::Callee(callee, args) => {
-                write!(f, "({}", callee)?;
-                for arg in args {
-                    write!(f, " {}", arg)?;
-                }
-                write!(f, ")")
-            }
-            ASTNode::Print(expr) => {
-                write!(f, "print!(")?;
-                for e in expr {
-                    write!(f, "{}, ", e)?;
-                }
-                write!(f, ")")
-            }
-            ASTNode::Let(identifier, expr) => {
-                write!(f, "let {} = {}", identifier, expr[0])
-            }
-            ASTNode::Assign(identifier, expr) => {
-                write!(f, "{} = {}", identifier, expr[0])
-            }
-            ASTNode::Op(head, rest) => {
-                write!(f, "({}", head)?;
-                for s in rest {
-                    write!(f, " {}", s)?
-                }
-                write!(f, ")")
-            }
-        }
-    }
-}
+////////////////////////////// Pratt Parser //////////////////////////////
+/// Pratt parser for parsing expressions from https://matklad.github.io/2020/04/13/simple-but-powerful-pratt-parsing.html
+//////////////////////////////////////////////////////////////////////////
 
 fn expr_bp(lexer: &mut Lexer, min_bp: u8) -> ASTNode {
     let current_token = lexer.next();
@@ -201,9 +166,9 @@ fn expr_bp(lexer: &mut Lexer, min_bp: u8) -> ASTNode {
         TokenType::Identifier => ASTNode::Identifier(current_token.lexeme),
         TokenType::Boolean(it) => ASTNode::Boolean(it),
         TokenType::String => ASTNode::String(current_token.lexeme),
-        TokenType::LEFT_PAREN => {
+        TokenType::LeftParen => {
             let lhs = expr_bp(lexer, 0);
-            assert_eq!(lexer.next().token_type, TokenType::RIGHT_PAREN);
+            assert_eq!(lexer.next().token_type, TokenType::RightParen);
             lhs
         }
         TokenType::PLUS
@@ -211,14 +176,14 @@ fn expr_bp(lexer: &mut Lexer, min_bp: u8) -> ASTNode {
         | TokenType::STAR
         | TokenType::SLASH
         | TokenType::AT
-        | TokenType::EQUAL_EQUAL
-        | TokenType::BANG_EQUAL
+        | TokenType::EqualEqual
+        | TokenType::BangEqual
         | TokenType::LESS
-        | TokenType::LESS_EQUAL
+        | TokenType::LessEqual
         | TokenType::GREATER
-        | TokenType::GREATER_EQUAL
+        | TokenType::GreaterEqual
         | TokenType::DOT
-        | TokenType::STAR_STAR
+        | TokenType::StarStar
         | TokenType::BANG => {
             let op = match current_token.token_type {
                 TokenType::PLUS => Ops::BinaryOp(BinaryOp::Add),
@@ -227,15 +192,15 @@ fn expr_bp(lexer: &mut Lexer, min_bp: u8) -> ASTNode {
                 TokenType::SLASH => Ops::BinaryOp(BinaryOp::Div),
                 TokenType::AT => Ops::BinaryOp(BinaryOp::At),
 
-                TokenType::EQUAL_EQUAL => Ops::BinaryOp(BinaryOp::Eq),
-                TokenType::BANG_EQUAL => Ops::BinaryOp(BinaryOp::Ne),
+                TokenType::EqualEqual => Ops::BinaryOp(BinaryOp::Eq),
+                TokenType::BangEqual => Ops::BinaryOp(BinaryOp::Ne),
                 TokenType::LESS => Ops::BinaryOp(BinaryOp::Lt),
-                TokenType::LESS_EQUAL => Ops::BinaryOp(BinaryOp::Le),
+                TokenType::LessEqual => Ops::BinaryOp(BinaryOp::Le),
                 TokenType::GREATER => Ops::BinaryOp(BinaryOp::Gt),
-                TokenType::GREATER_EQUAL => Ops::BinaryOp(BinaryOp::Ge),
+                TokenType::GreaterEqual => Ops::BinaryOp(BinaryOp::Ge),
 
                 TokenType::DOT => Ops::PostfixOp(PostfixOp::Call),
-                TokenType::STAR_STAR => Ops::PostfixOp(PostfixOp::StarStar),
+                TokenType::StarStar => Ops::PostfixOp(PostfixOp::StarStar),
 
                 TokenType::BANG => Ops::UnaryOp(UnaryOp::Not),
 
@@ -244,10 +209,9 @@ fn expr_bp(lexer: &mut Lexer, min_bp: u8) -> ASTNode {
 
             let ((), r_bp) = prefix_binding_power(op);
             let rhs = expr_bp(lexer, r_bp);
-            // print!("{} ", op);
             ASTNode::Op(op, vec![rhs])
         }
-        t => panic!("bad token: {:?}", t),
+        t => Err(vm::Result::CompileErr(format!("bad token: {:?}", t))).unwrap(),
     };
 
     loop {
@@ -259,28 +223,28 @@ fn expr_bp(lexer: &mut Lexer, min_bp: u8) -> ASTNode {
             TokenType::SLASH => Ops::BinaryOp(BinaryOp::Div),
             TokenType::AT => Ops::BinaryOp(BinaryOp::At),
 
-            TokenType::EQUAL_EQUAL => Ops::BinaryOp(BinaryOp::Eq),
-            TokenType::BANG_EQUAL => Ops::BinaryOp(BinaryOp::Ne),
+            TokenType::EqualEqual => Ops::BinaryOp(BinaryOp::Eq),
+            TokenType::BangEqual => Ops::BinaryOp(BinaryOp::Ne),
             TokenType::LESS => Ops::BinaryOp(BinaryOp::Lt),
-            TokenType::LESS_EQUAL => Ops::BinaryOp(BinaryOp::Le),
+            TokenType::LessEqual => Ops::BinaryOp(BinaryOp::Le),
             TokenType::GREATER => Ops::BinaryOp(BinaryOp::Gt),
-            TokenType::GREATER_EQUAL => Ops::BinaryOp(BinaryOp::Ge),
+            TokenType::GreaterEqual => Ops::BinaryOp(BinaryOp::Ge),
 
             TokenType::DOT => Ops::PostfixOp(PostfixOp::Call),
-            TokenType::LEFT_BRACKET => Ops::PostfixOp(PostfixOp::Index),
-            TokenType::STAR_STAR => Ops::PostfixOp(PostfixOp::StarStar),
+            TokenType::LeftBracket => Ops::PostfixOp(PostfixOp::Index),
+            TokenType::StarStar => Ops::PostfixOp(PostfixOp::StarStar),
 
             TokenType::BANG => Ops::UnaryOp(UnaryOp::Negate),
 
-            TokenType::LEFT_PAREN => break,
-            TokenType::RIGHT_PAREN => break,
-            TokenType::RIGHT_BRACKET => break,
+            TokenType::LeftParen => break,
+            TokenType::RightParen => break,
+            TokenType::RightBracket => break,
             TokenType::COMMA => break,
             TokenType::SEMICOLON => break,
-            t => panic!("bad token: {:?}", t),
+            t => Err(vm::Result::CompileErr(format!("bad token: {:?}", t))).unwrap(),
         };
 
-        if let Some((l_bp, ())) = postfix_binding_power(op) {
+        if let Some((l_bp, _)) = postfix_binding_power(op) {
             if l_bp < min_bp {
                 break;
             }
@@ -288,19 +252,16 @@ fn expr_bp(lexer: &mut Lexer, min_bp: u8) -> ASTNode {
 
             lhs = if op == Ops::PostfixOp(PostfixOp::Index) {
                 let rhs = expr_bp(lexer, 0);
-                assert_eq!(lexer.next().token_type, TokenType::RIGHT_BRACKET);
+                assert_eq!(lexer.next().token_type, TokenType::RightBracket);
                 ASTNode::Op(op, vec![lhs, rhs])
             } else if op == Ops::PostfixOp(PostfixOp::Call) {
-                // identifier
                 let callee_token = lexer.next();
                 assert_eq!(callee_token.token_type, TokenType::Identifier);
 
-                // left paren
-                assert_eq!(lexer.next().token_type, TokenType::LEFT_PAREN);
+                assert_eq!(lexer.next().token_type, TokenType::LeftParen);
 
-                // a, b, c
                 let mut args = Vec::new();
-                while lexer.peek().token_type != TokenType::RIGHT_PAREN {
+                while lexer.peek().token_type != TokenType::RightParen {
                     args.push(expr_bp(lexer, 0));
                     if lexer.peek().token_type == TokenType::COMMA {
                         lexer.next();
@@ -348,14 +309,12 @@ fn expr_bp(lexer: &mut Lexer, min_bp: u8) -> ASTNode {
 fn prefix_binding_power(op: Ops) -> ((), u8) {
     match op {
         Ops::UnaryOp(UnaryOp::Not) | Ops::UnaryOp(UnaryOp::Negate) => ((), 15),
-        _ => panic!("bad op: {:?}", op),
+        _ => Err(vm::Result::CompileErr(format!("bad token: {:?}", op))).unwrap(),
     }
 }
 
 fn postfix_binding_power(op: Ops) -> Option<(u8, ())> {
     let res = match op {
-        // '!' => (11, ()),
-        // '[' => (11, ()),
         Ops::PostfixOp(PostfixOp::Index) => (13, ()),
         Ops::PostfixOp(PostfixOp::Call) => (14, ()),
         Ops::PostfixOp(PostfixOp::StarStar) => (16, ()),
@@ -366,18 +325,11 @@ fn postfix_binding_power(op: Ops) -> Option<(u8, ())> {
 
 fn infix_binding_power(op: Ops) -> Option<(u8, u8)> {
     let res = match op {
-        // '=' => (2, 1),
-        // '?' => (4, 3),
-
-        // Token::Or => (1, 2),
-        // Token::And => (3, 4),
         Ops::BinaryOp(BinaryOp::Eq) | Ops::BinaryOp(BinaryOp::Ne) => (5, 6),
-
         Ops::BinaryOp(BinaryOp::Lt)
         | Ops::BinaryOp(BinaryOp::Le)
         | Ops::BinaryOp(BinaryOp::Gt)
         | Ops::BinaryOp(BinaryOp::Ge) => (7, 8),
-
         Ops::BinaryOp(BinaryOp::Add) | Ops::BinaryOp(BinaryOp::Sub) => (9, 10),
         Ops::BinaryOp(BinaryOp::Mul) | Ops::BinaryOp(BinaryOp::Div) => (11, 12),
         Ops::BinaryOp(BinaryOp::At) => (14, 13),
@@ -385,6 +337,76 @@ fn infix_binding_power(op: Ops) -> Option<(u8, u8)> {
         _ => return None,
     };
     Some(res)
+}
+
+////////////////////////////////////////
+//////// Display for Ops & AST /////////
+use colored::*;
+
+impl fmt::Display for Ops {
+    
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        
+        match self {
+            Ops::BinaryOp(BinaryOp::Add) => write!(f, "{}", "+".green()),
+            Ops::BinaryOp(BinaryOp::Sub) => write!(f, "{}", "-".green()),
+            Ops::BinaryOp(BinaryOp::Mul) => write!(f, "{}", "*".green()),
+            Ops::BinaryOp(BinaryOp::Div) => write!(f, "{}", "/".green()),
+            Ops::BinaryOp(BinaryOp::At) => write!(f, "{}", "@".green()),
+            Ops::BinaryOp(BinaryOp::Eq) => write!(f, "{}", "==".green()),
+            Ops::BinaryOp(BinaryOp::Ne) => write!(f, "{}", "!=".green()),
+            Ops::BinaryOp(BinaryOp::Lt) => write!(f, "{}", "<".green()),
+            Ops::BinaryOp(BinaryOp::Le) => write!(f, "{}", "<=".green()),
+            Ops::BinaryOp(BinaryOp::Gt) => write!(f, "{}", ">".green()),
+            Ops::BinaryOp(BinaryOp::Ge) => write!(f, "{}", ">=".green()),
+
+            Ops::UnaryOp(UnaryOp::Negate) => write!(f, "{}", "-".green()),
+            Ops::UnaryOp(UnaryOp::Not) => write!(f, "{}", "!".green()),
+
+            Ops::PostfixOp(PostfixOp::Index) => write!(f, "["),
+            Ops::PostfixOp(PostfixOp::Call) => write!(f, "."),
+            Ops::PostfixOp(PostfixOp::StarStar) => write!(f, "**"),
+            // Ops::PostfixOp(PostfixOp::Args) => write!(f, ","),
+        }
+    }
+}
+
+impl fmt::Display for ASTNode {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ASTNode::Number(i) => write!(f, "{}", i.to_string().blue()),
+            ASTNode::Identifier(s) => write!(f, "{}", s.red()),
+            ASTNode::Boolean(b) => write!(f, "{}", b.to_string().yellow()),
+            ASTNode::String(s) => write!(f, "{}", s.yellow()),
+            ASTNode::Callee(callee, args) => {
+                write!(f, "({}", callee.purple().magenta())?;
+                for arg in args {
+                    write!(f, " {}", arg)?;
+                }
+                write!(f, "{}", ")".normal().clear())
+            }
+            ASTNode::Print(expr) => {
+                write!(f, "print!(")?;
+                for e in expr {
+                    write!(f, "{}, ", e)?;
+                }
+                write!(f, ")")
+            }
+            ASTNode::Let(identifier, expr) => {
+                write!(f, "let {} = {}", identifier, expr[0])
+            }
+            ASTNode::Assign(identifier, expr) => {
+                write!(f, "{} = {}", identifier, expr[0])
+            }
+            ASTNode::Op(head, rest) => {
+                write!(f, "({}", head)?;
+                for s in rest {
+                    write!(f, " {}", s)?
+                }
+                write!(f, ")")
+            }
+        }
+    }
 }
 
 #[cfg(test)]
@@ -483,9 +505,6 @@ mod tests {
         // let declaration tests; let a= 3;
         let s = parse("let a = 3;");
         assert_eq!(s, "let a = 3");
-
-        // let s = parse("let a = 3; let b = 4;");
-        // assert_eq!(s, "let a = 3; let b = 4");
 
         // assignment tests; a = 3, a+=3, a-=4, a*=5, a/=6
         let s = parse("a += 3;");
