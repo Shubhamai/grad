@@ -25,7 +25,7 @@ pub fn run_source(src: &str) -> String {
     let (bytecode, interner) = compiler.compile(out);
     println!("{:?}", bytecode);
 
-    let debug = debug::Debug::new("test", bytecode.clone());
+    let debug = debug::Debug::new("test", bytecode.clone(), interner.clone());
     debug.disassemble();
 
     let mut vm = vm::VM::init(bytecode, interner);

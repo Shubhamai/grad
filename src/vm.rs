@@ -81,7 +81,7 @@ impl VM {
                 match $index {
                     chunk::VectorType::Constant(idx) => self.read_constant(idx as usize),
                     _ => {
-                        return Result::RuntimeErr("Invalid constant index".to_string());
+                        return Result::RuntimeErr(format!("Invalid constant '{}'", $index));
                     }
                 }
             };
@@ -179,11 +179,17 @@ impl VM {
                             if let Some(value) = value {
                                 push!(value.clone());
                             } else {
-                                return Result::RuntimeErr("Undefined global variable".to_string());
+                                return Result::RuntimeErr(format!(
+                                    "Undefined variable '{}'",
+                                    self.interner.lookup(idx)
+                                ));
                             }
                         }
                         _ => {
-                            return Result::RuntimeErr("Invalid global variable".to_string());
+                            return Result::RuntimeErr(format!(
+                                "Invalid global variable '{}'",
+                                constant
+                            ));
                         }
                     }
                 }
@@ -198,10 +204,14 @@ impl VM {
                             // TODO - only set the value if it exists
                         }
                         _ => {
-                            return Result::RuntimeErr("Invalid global variable".to_string());
+                            return Result::RuntimeErr(format!(
+                                "Invalid global variable '{}'",
+                                constant
+                            ));
                         }
                     }
                 }
+                opcode!(OpGetLocal) => {}
                 opcode!(OpCall) => {
                     let callee = self.read_byte();
                     let caller = pop!();
@@ -231,7 +241,9 @@ impl VM {
                         }
                     }
                 }
-                VectorType::Constant(_) => {}
+                _ => {
+                    return Result::RuntimeErr(format!("Invalid opcode '{}'", instruction));
+                } // VectorType::Constant(_) => {}
             }
         }
     }

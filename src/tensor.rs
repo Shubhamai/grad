@@ -9,10 +9,17 @@ use std::{
     rc::Rc,
 };
 
-#[derive(Clone, Eq, Debug, PartialEq)]
+#[derive(Clone, Eq, PartialEq)]
 pub struct Tensor(Rc<RefCell<TensorInternal>>);
 
 impl std::fmt::Display for Tensor {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{}", self.borrow().data)
+    }
+}
+
+// debug print
+impl std::fmt::Debug for Tensor {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "{}", self.borrow().data)
     }

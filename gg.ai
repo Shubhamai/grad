@@ -1,0 +1,14 @@
+
+{
+    var b = 5;
+    print b;
+
+    {
+        var c = 10;
+        print c;
+    }
+
+    print c;
+}
+
+print b;

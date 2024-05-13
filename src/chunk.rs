@@ -12,6 +12,8 @@ pub enum OpCode {
     OpSubtract,
     OpMultiply,
     OpDivide,
+    OpPower,
+
     OpNot,
     OpEqualEqual,
     OpGreater,
@@ -22,7 +24,10 @@ pub enum OpCode {
     OpDefineGlobal,
     OpGetGlobal,
     OpSetGlobal,
-    OpPower,
+
+    OpDefineLocal,
+    OpGetLocal,
+    OpSetLocal,
 
     OpCall,
 }
@@ -71,6 +76,8 @@ impl std::fmt::Display for OpCode {
             OpCode::OpSubtract => write!(f, "OP_SUBTRACT"),
             OpCode::OpMultiply => write!(f, "OP_MULTIPLY"),
             OpCode::OpDivide => write!(f, "OP_DIVIDE"),
+            OpCode::OpPower => write!(f, "OP_POWER"),
+
             OpCode::OpNil => write!(f, "OP_NIL"),
             OpCode::OpTrue => write!(f, "OP_TRUE"),
             OpCode::OpFalse => write!(f, "OP_FALSE"),
@@ -83,7 +90,11 @@ impl std::fmt::Display for OpCode {
             OpCode::OpDefineGlobal => write!(f, "OP_DEFINE_GLOBAL"),
             OpCode::OpGetGlobal => write!(f, "OP_GET_GLOBAL"),
             OpCode::OpSetGlobal => write!(f, "OP_SET_GLOBAL"),
-            OpCode::OpPower => write!(f, "OP_POWER"),
+
+            OpCode::OpDefineLocal => write!(f, "OP_DEFINE_LOCAL"),
+            OpCode::OpGetLocal => write!(f, "OP_GET_LOCAL"),
+            OpCode::OpSetLocal => write!(f, "OP_SET_LOCAL"),
+
             OpCode::OpCall => write!(f, "OP_CALL"),
         }
     }

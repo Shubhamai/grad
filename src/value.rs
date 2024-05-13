@@ -13,7 +13,7 @@ pub enum ValueType {
 impl std::fmt::Display for ValueType {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            ValueType::Tensor(n) => write!(f, "tensor->{}", n),
+            ValueType::Tensor(n) => write!(f, "tnsr->{}", n),
             ValueType::String(s) => write!(f, "str->{}", s),
             ValueType::Identifier(s) => write!(f, "iden->{}", s),
             ValueType::Boolean(b) => write!(f, "bool->{}", b),

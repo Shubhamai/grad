@@ -1,3 +1,5 @@
+// https://huyenchip.com/2021/09/07/a-friendly-introduction-to-machine-learning-compilers-and-optimizers.html
+
 use crate::{
     ast::{ASTNode, BinaryOp, Ops, PostfixOp, UnaryOp},
     chunk::{Chunk, OpCode, VectorType},
@@ -6,9 +8,27 @@ use crate::{
     value::ValueType,
 };
 
+#[derive(Debug, Clone, Default)]
+struct Local {
+    name: String,
+    depth: u8,
+}
+
+// impl display for Local
+impl std::fmt::Display for Local {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}, {}", self.name, self.depth)
+    }
+}
+
 pub struct Compiler {
     chunk: Chunk,
     interner: Interner,
+
+    // local variables
+    locals: [Local; 256],
+    local_count: usize,
+    scope_depth: u8,
 }
 
 // write a macro that can take single of multiple opcode and write it to the chunk, ( without mentioning self.chunk )
@@ -35,6 +55,10 @@ impl Compiler {
         Self {
             chunk: Chunk::new(),
             interner: Interner::default(),
+
+            locals: core::array::from_fn(|_| Local::default()),
+            local_count: 0,
+            scope_depth: 0,
         }
     }
 
@@ -67,6 +91,15 @@ impl Compiler {
                 write_cons!(self.chunk, self.chunk.constants.len() - 1);
             }
             ASTNode::Identifier(iden) => {
+                if self.scope_depth > 0 {
+                    let local = self.locals.iter().rev().find(|local| local.name == iden);
+                    if let Some(local) = local {
+                        write_op!(self.chunk, OpCode::OpGetLocal);
+                        write_cons!(self.chunk, local.depth as usize);
+                        return;
+                    }
+                }
+
                 write_op!(self.chunk, OpCode::OpGetGlobal);
                 let global = self
                     .chunk
@@ -104,7 +137,6 @@ impl Compiler {
 
                     Ops::PostfixOp(PostfixOp::StarStar) => write_op!(self.chunk, OpCode::OpPower),
                     Ops::PostfixOp(PostfixOp::Call) => {
-                        // self.chunk.write(VectorType::Code(OpCode::OpCall));
                         write_op!(self.chunk, OpCode::OpCall);
                         self.chunk
                             .write(VectorType::Constant(self.chunk.constants.len() - 1));
@@ -121,13 +153,31 @@ impl Compiler {
             ASTNode::Let(iden, expr) => {
                 assert!(expr.len() == 1);
 
+                if self.scope_depth > 0 {
+                    let local = Local {
+                        name: iden.clone(),
+                        depth: self.scope_depth,
+                    };
+                    self.locals[self.local_count] = local;
+                    self.local_count += 1;
+
+                    
+                }
+
                 let global = add_con!(
                     self.chunk,
                     ValueType::Identifier(self.interner.intern_string(iden))
                 );
+
+
+
                 self.visit(expr[0].clone());
-                write_op!(self.chunk, OpCode::OpDefineGlobal);
-                write_cons!(self.chunk, global);
+                
+
+                
+                
+                // write_op!(self.chunk, OpCode::OpDefineGlobal);
+                // write_cons!(self.chunk, global);
             }
             ASTNode::Assign(iden, expr) => {
                 assert!(expr.len() == 1);
@@ -139,6 +189,11 @@ impl Compiler {
                 self.visit(expr[0].clone());
                 write_op!(self.chunk, OpCode::OpSetGlobal);
                 write_cons!(self.chunk, global);
+            }
+            ASTNode::Block(stmts) => {
+                self.scope_depth += 1;
+                stmts.iter().for_each(|stmt| self.visit(stmt.clone()));
+                self.scope_depth -= 1;
             }
             ASTNode::Callee(iden, _) => {
                 let global = add_con!(

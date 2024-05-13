@@ -17,6 +17,7 @@ pub enum ASTNode {
     Let(String, Vec<ASTNode>),
     Assign(String, Vec<ASTNode>),
     Print(Vec<ASTNode>),
+    Block(Vec<ASTNode>), // depth, statements
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -77,7 +78,13 @@ impl<'a> Parser<'a> {
             let statement = match self.lexer.peek().token_type {
                 TokenType::PRINT => self.parse_print(),
                 TokenType::LET => self.parse_let(),
-
+                TokenType::LeftBrace => {
+                    self.lexer.next();
+                    let statements = self.parse();
+                    assert_eq!(self.lexer.next().token_type, TokenType::RightBrace);
+                    ASTNode::Block(statements)
+                }
+                TokenType::RightBrace => break,
                 // contains equal pr +=, -=, *=, /=
                 TokenType::Identifier
                     if self.lexer.peek_n_type(2).contains(&TokenType::EQUAL)
@@ -344,9 +351,7 @@ fn infix_binding_power(op: Ops) -> Option<(u8, u8)> {
 use colored::*;
 
 impl fmt::Display for Ops {
-    
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        
         match self {
             Ops::BinaryOp(BinaryOp::Add) => write!(f, "{}", "+".green()),
             Ops::BinaryOp(BinaryOp::Sub) => write!(f, "{}", "-".green()),
@@ -394,6 +399,12 @@ impl fmt::Display for ASTNode {
             }
             ASTNode::Let(identifier, expr) => {
                 write!(f, "let {} = {}", identifier, expr[0])
+            }
+            ASTNode::Block(statements) => {
+                for stmt in statements {
+                    write!(f, "{}", stmt)?;
+                }
+                write!(f, "")
             }
             ASTNode::Assign(identifier, expr) => {
                 write!(f, "{} = {}", identifier, expr[0])

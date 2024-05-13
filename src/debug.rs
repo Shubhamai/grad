@@ -1,16 +1,18 @@
-use crate::chunk;
+use crate::{chunk, interner::Interner, value::ValueType};
 use colored::*;
 
 pub struct Debug {
     name: String,
+    interner: Interner,
     chunk: chunk::Chunk,
 }
 
 impl Debug {
-    pub fn new(name: &str, chunk: chunk::Chunk) -> Self {
+    pub fn new(name: &str, chunk: chunk::Chunk, interner: Interner) -> Self {
         Self {
             name: name.to_string(),
             chunk,
+            interner,
         }
     }
 
@@ -63,25 +65,40 @@ impl Debug {
                 | chunk::OpCode::OpDefineGlobal
                 | chunk::OpCode::OpGetGlobal
                 | chunk::OpCode::OpSetGlobal
+                | chunk::OpCode::OpDefineLocal
+                | chunk::OpCode::OpGetLocal
+                | chunk::OpCode::OpSetLocal
                 | chunk::OpCode::OpCall,
             ) => {
                 let constant = self.chunk.code[offset + 1];
                 match constant {
-                    chunk::VectorType::Constant(idx) => {
-                        println!(
-                            "{:04} {} {:04} | {}",
-                            offset.to_string().yellow(),
-                            instruction.to_string().red(),
-                            constant.to_string().green().italic(),
-                            self.chunk.constants[idx]
-                                .to_string()
-                                .purple()
-                                .magenta()
-                                .italic()
-                        );
-                    }
+                    chunk::VectorType::Constant(idx) => match self.chunk.constants[idx] {
+                        ValueType::String(s) | ValueType::Identifier(s) => {
+                            println!(
+                                "{:04} {} {:20} | {}{}",
+                                offset.to_string().yellow(),
+                                instruction.to_string().red(),
+                                constant.to_string().green().italic(),
+                                "intr->".purple().magenta().italic(),
+                                self.interner.lookup(s).purple().magenta().italic()
+                            );
+                        }
+                        _ => {
+                            println!(
+                                "{:04} {} {:20} | {}",
+                                offset.to_string().yellow(),
+                                instruction.to_string().red(),
+                                constant.to_string().green().italic(),
+                                self.chunk.constants[idx]
+                                    .to_string()
+                                    .purple()
+                                    .magenta()
+                                    .italic()
+                            );
+                        }
+                    },
                     _ => {
-                        println!("{:04} {} {:04}", offset, instruction, constant);
+                        unreachable!();
                     }
                 }
                 return offset + 2;
