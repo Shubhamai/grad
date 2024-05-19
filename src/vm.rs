@@ -1,4 +1,4 @@
-use std::{any::Any, clone, collections::HashMap};
+use std::collections::HashMap;
 use thiserror::Error;
 
 use crate::{
@@ -38,15 +38,12 @@ pub enum Result {
     RuntimeErr(String),
 }
 
-// write code to shrink chunk::VectorType::Code(chunk::OpCode::OpReturn) to Code(OpReturn)
-
 impl VM {
-    // pub(crate) fn init(chunk: Chunk) -> VM {
     pub(crate) fn init(chunk: Chunk, interner: Interner) -> VM {
         VM {
             chunk,
             ip: 0,
-            stack: core::array::from_fn(|i| ValueType::Nil),
+            stack: core::array::from_fn(|_| ValueType::Nil),
             stack_top: 0,
             interner,
             globals: HashMap::new(),
@@ -68,14 +65,12 @@ impl VM {
             };
         }
 
-        /// Macro to generate the opcode enum `opcode!(OpReturn)` to `chunk::VectorType::Code(chunk::OpCode::OpReturn)`
         macro_rules! opcode {
             ($op:ident) => {
                 chunk::VectorType::Code(chunk::OpCode::$op)
             };
         }
 
-        /// Macro to get the constant from the chunk
         macro_rules! get_constant {
             ($index:expr) => {
                 match $index {
@@ -211,7 +206,32 @@ impl VM {
                         }
                     }
                 }
-                opcode!(OpGetLocal) => {}
+                opcode!(OpGetLocal) => {
+                    let slot = self.read_byte();
+
+                    match slot {
+                        VectorType::Constant(idx) => {
+                            let value = self.stack[idx as usize].clone();
+                            push!(value);
+                        }
+                        _ => {
+                            return Result::RuntimeErr(format!("Invalid slot '{}'", slot));
+                        }
+                    }
+                }
+                opcode!(OpSetLocal) => {
+                    let slot = self.read_byte();
+
+                    match slot {
+                        VectorType::Constant(idx) => {
+                            let value = self.peek(0);
+                            self.stack[idx as usize] = value;
+                        }
+                        _ => {
+                            return Result::RuntimeErr(format!("Invalid slot '{}'", slot));
+                        }
+                    }
+                }
                 opcode!(OpCall) => {
                     let callee = self.read_byte();
                     let caller = pop!();
@@ -242,15 +262,21 @@ impl VM {
                     }
                 }
                 _ => {
-                    return Result::RuntimeErr(format!("Invalid opcode '{}'", instruction));
-                } // VectorType::Constant(_) => {}
+                    return {
+                        if let chunk::VectorType::Constant(idx) = instruction {
+                            let value = self.read_constant(idx as usize);
+                            println!("Constant: {:?}", value);
+                        }
+
+                        Result::RuntimeErr(format!("Invalid opcode '{}'", instruction))
+                    };
+                }
             }
         }
     }
 
-    // Reads the byte currently pointed at by ip and then advances the instruction pointer - book
     fn read_byte(&mut self) -> VectorType {
-        let byte = self.chunk.code[self.ip];
+        let byte = self.chunk.code[self.ip].clone();
         self.ip += 1;
         return byte;
     }

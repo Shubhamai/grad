@@ -83,7 +83,7 @@ fn main() {
 //     }
 // }
 
-pub fn run_source(src: &str) {
+pub fn run_source(src: &str) -> Result {
     let mut lexer = Lexer::new(src.to_string());
 
     let out = Parser::new(&mut lexer).parse();
@@ -104,7 +104,7 @@ pub fn run_source(src: &str) {
 
     println!("{:?}", result);
 
-    // return result;
+    return result;
 }
 
 #[cfg(test)]
@@ -131,9 +131,45 @@ mod tests {
 
         let out = run_source(&src);
 
-        // assert_eq!(
-        //     out,
-        //     Result::Ok(vec![ValueType::Tensor(Tensor::from(24.70408163265306))])
-        // );
+        assert_eq!(
+            out,
+            Result::Ok(vec![ValueType::Tensor(Tensor::from(24.70408163265306))])
+        );
+    }
+
+    #[test]
+    fn test_scopes() {
+        let src = r#"
+        let a = 4;
+        {
+            let b = 5;
+            print(b);
+            {
+                let c = 10;
+                print(c);
+                let b = 353;
+                print(b);
+            }
+            print(b);
+            b = 11;
+            print(b);
+            a = 12;
+        }
+        print(a);
+        "#;
+
+        let out = run_source(&src);
+
+        assert_eq!(
+            out,
+            Result::Ok(vec![
+                ValueType::Tensor(Tensor::from(5.0)),
+                ValueType::Tensor(Tensor::from(10.0)),
+                ValueType::Tensor(Tensor::from(353.0)),
+                ValueType::Tensor(Tensor::from(5.0)),
+                ValueType::Tensor(Tensor::from(11.0)),
+                ValueType::Tensor(Tensor::from(12.0))
+            ])
+        );
     }
 }

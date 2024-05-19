@@ -26,12 +26,12 @@ pub struct Compiler {
     interner: Interner,
 
     // local variables
-    locals: [Local; 256],
+    locals: Vec<Local>,
     local_count: usize,
     scope_depth: u8,
 }
 
-// write a macro that can take single of multiple opcode and write it to the chunk, ( without mentioning self.chunk )
+// write a macro that can take single or multiple opcodes and write them to the chunk, (without mentioning self.chunk)
 macro_rules! write_op {
     ($chunk:expr, $($op:expr),*) => {
         $( $chunk.write(VectorType::Code($op)))*
@@ -55,8 +55,7 @@ impl Compiler {
         Self {
             chunk: Chunk::new(),
             interner: Interner::default(),
-
-            locals: core::array::from_fn(|_| Local::default()),
+            locals: Vec::new(),
             local_count: 0,
             scope_depth: 0,
         }
@@ -91,20 +90,16 @@ impl Compiler {
                 write_cons!(self.chunk, self.chunk.constants.len() - 1);
             }
             ASTNode::Identifier(iden) => {
-                if self.scope_depth > 0 {
-                    let local = self.locals.iter().rev().find(|local| local.name == iden);
-                    if let Some(local) = local {
-                        write_op!(self.chunk, OpCode::OpGetLocal);
-                        write_cons!(self.chunk, local.depth as usize);
-                        return;
-                    }
+                if let Some(local) = self.resolve_local(&iden) {
+                    write_op!(self.chunk, OpCode::OpGetLocal);
+                    write_cons!(self.chunk, local);
+                } else {
+                    write_op!(self.chunk, OpCode::OpGetGlobal);
+                    let global = self
+                        .chunk
+                        .add_constant(ValueType::Identifier(self.interner.intern_string(iden)));
+                    write_cons!(self.chunk, global);
                 }
-
-                write_op!(self.chunk, OpCode::OpGetGlobal);
-                let global = self
-                    .chunk
-                    .add_constant(ValueType::Identifier(self.interner.intern_string(iden)));
-                write_cons!(self.chunk, global);
             }
             ASTNode::Op(op, vec) => {
                 for node in vec {
@@ -121,21 +116,27 @@ impl Compiler {
                     Ops::BinaryOp(BinaryOp::Eq) => write_op!(self.chunk, OpCode::OpEqualEqual),
                     Ops::BinaryOp(BinaryOp::Ne) => {
                         write_op!(self.chunk, OpCode::OpEqualEqual);
-                        write_op!(self.chunk, OpCode::OpNot)
+                        write_op!(self.chunk, OpCode::OpNot);
                     }
                     Ops::BinaryOp(BinaryOp::Lt) => write_op!(self.chunk, OpCode::OpLess),
                     Ops::BinaryOp(BinaryOp::Le) => {
                         write_op!(self.chunk, OpCode::OpGreater);
-                        write_op!(self.chunk, OpCode::OpNot)
+                        write_op!(self.chunk, OpCode::OpNot);
                     }
-                    Ops::BinaryOp(BinaryOp::Gt) => write_op!(self.chunk, OpCode::OpGreater),
+                    Ops::BinaryOp(BinaryOp::Gt) => {
+                        write_op!(self.chunk, OpCode::OpGreater);
+                    }
                     Ops::BinaryOp(BinaryOp::Ge) => {
                         write_op!(self.chunk, OpCode::OpLess);
-                        write_op!(self.chunk, OpCode::OpNot)
+                        write_op!(self.chunk, OpCode::OpNot);
                     }
-                    Ops::UnaryOp(UnaryOp::Negate) => write_op!(self.chunk, OpCode::OpNegate),
+                    Ops::UnaryOp(UnaryOp::Negate) => {
+                        write_op!(self.chunk, OpCode::OpNegate);
+                    }
 
-                    Ops::PostfixOp(PostfixOp::StarStar) => write_op!(self.chunk, OpCode::OpPower),
+                    Ops::PostfixOp(PostfixOp::StarStar) => {
+                        write_op!(self.chunk, OpCode::OpPower);
+                    }
                     Ops::PostfixOp(PostfixOp::Call) => {
                         write_op!(self.chunk, OpCode::OpCall);
                         self.chunk
@@ -154,46 +155,55 @@ impl Compiler {
                 assert!(expr.len() == 1);
 
                 if self.scope_depth > 0 {
-                    let local = Local {
-                        name: iden.clone(),
+                    if self.local_count == 256 {
+                        panic!("Too many local variables.");
+                    }
+                    self.locals.push(Local {
+                        name: iden,
                         depth: self.scope_depth,
-                    };
-                    self.locals[self.local_count] = local;
+                    });
                     self.local_count += 1;
-
-                    
+                    self.visit(expr[0].clone());
+                    return;
                 }
 
                 let global = add_con!(
                     self.chunk,
                     ValueType::Identifier(self.interner.intern_string(iden))
                 );
-
-
-
                 self.visit(expr[0].clone());
-                
-
-                
-                
-                // write_op!(self.chunk, OpCode::OpDefineGlobal);
-                // write_cons!(self.chunk, global);
+                write_op!(self.chunk, OpCode::OpDefineGlobal);
+                write_cons!(self.chunk, global);
             }
             ASTNode::Assign(iden, expr) => {
                 assert!(expr.len() == 1);
-
-                let global = add_con!(
-                    self.chunk,
-                    ValueType::Identifier(self.interner.intern_string(iden))
-                );
                 self.visit(expr[0].clone());
-                write_op!(self.chunk, OpCode::OpSetGlobal);
-                write_cons!(self.chunk, global);
+
+                if let Some(local) = self.resolve_local(&iden) {
+                    write_op!(self.chunk, OpCode::OpSetLocal);
+                    write_cons!(self.chunk, local);
+                } else {
+                    let global = add_con!(
+                        self.chunk,
+                        ValueType::Identifier(self.interner.intern_string(iden))
+                    );
+                    write_op!(self.chunk, OpCode::OpSetGlobal);
+                    write_cons!(self.chunk, global);
+                }
             }
             ASTNode::Block(stmts) => {
                 self.scope_depth += 1;
-                stmts.iter().for_each(|stmt| self.visit(stmt.clone()));
+                for stmt in stmts {
+                    self.visit(stmt);
+                }
                 self.scope_depth -= 1;
+
+                while self.local_count > 0
+                    && self.locals[self.local_count - 1].depth > self.scope_depth
+                {
+                    self.local_count -= 1;
+                    write_op!(self.chunk, OpCode::OpPop);
+                }
             }
             ASTNode::Callee(iden, _) => {
                 let global = add_con!(
@@ -203,5 +213,14 @@ impl Compiler {
                 write_cons!(self.chunk, global);
             }
         }
+    }
+
+    fn resolve_local(&self, name: &String) -> Option<usize> {
+        for i in (0..self.local_count).rev() {
+            if self.locals[i].name == *name {
+                return Some(i);
+            }
+        }
+        None
     }
 }
