@@ -212,6 +212,31 @@ impl Compiler {
                 );
                 write_cons!(self.chunk, global);
             }
+            ASTNode::If(cond, then, els) => {
+                assert_eq!(cond.len(), 1);
+                self.visit(cond[0].clone());
+
+                // Jump to the else block if the condition is false
+                let jump_to_else = self.chunk.write_jump(OpCode::OpJumpIfFalse, 0);
+
+                then.iter().for_each(|stmt| self.visit(stmt.clone()));
+
+                // Jump over the "else" block after executing the "then" block
+                let jump_to_end = self.chunk.write_jump(OpCode::OpJump, 0);
+
+                // Update the jump offset for the else block
+                let else_offset = self.chunk.code.len();
+                self.chunk.patch_jump(jump_to_else);
+
+                // Compile the "else" block if it exists
+                if let Some(els) = els {
+                    els.iter().for_each(|stmt| self.visit(stmt.clone()));
+                }
+
+                // Update the jump offset for the end of the if statement
+                let end_offset = self.chunk.code.len();
+                self.chunk.patch_jump(jump_to_end);
+            }
         }
     }
 

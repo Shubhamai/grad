@@ -1,4 +1,4 @@
-use crate::value::ValueType;
+use crate::{tensor::Tensor, value::ValueType};
 
 #[derive(Debug, Clone, Copy)]
 #[repr(u8)]
@@ -28,6 +28,9 @@ pub enum OpCode {
     OpDefineLocal,
     OpGetLocal,
     OpSetLocal,
+
+    OpJumpIfFalse,
+    OpJump,
 
     OpCall,
 }
@@ -60,6 +63,34 @@ impl Chunk {
         self.constants.push(value);
         self.constants.len() - 1 // return the index of the constant
     }
+
+    pub fn write_jump(&mut self, op_code: OpCode, jump_to: usize) -> usize {
+        // Write the jump instruction with a placeholder offset
+        let offset = self.code.len(); // Placeholder offset
+        self.write(VectorType::Code(op_code));
+        self.add_constant(ValueType::Tensor(Tensor::from(jump_to as f64))); // Placeholder jump offset
+        offset // Return the offset to be patched later
+    }
+
+    pub fn patch_jump(&mut self, offset: usize) {
+        // Calculate the jump offset from the beginning of the code
+        let jump_offset = self.code.len() - offset - 1;
+        // Patch the jump instruction with the calculated offset
+        println!("Patching jump at offset {} with jump offset {}", offset, jump_offset);
+        // if let VectorType::Code(OpCode::OpJump) = self.code[offset].clone() {
+        //     if let VectorType::Constant(ValueType::Tensor(mut tensor)) = self.code[offset + 1].clone() {
+        //         tensor[0] = jump_offset as f64;
+        //         self.code[offset + 1] = VectorType::Constant(ValueType::Tensor(tensor));
+        //     }
+        // } else if let VectorType::Code(OpCode::OpJumpIfFalse) = self.code[offset].clone() {
+        //     if let VectorType::Constant(ValueType::Tensor(mut tensor)) = self.code[offset + 1].clone() {
+        //         tensor[0] = jump_offset as f64;
+        //         self.code[offset + 1] = VectorType::Constant(ValueType::Tensor(tensor));
+        //     }
+        // }
+    }
+
+    
 }
 
 ////////////////////////
@@ -82,7 +113,7 @@ impl std::fmt::Display for OpCode {
             OpCode::OpTrue => write!(f, "OP_TRUE"),
             OpCode::OpFalse => write!(f, "OP_FALSE"),
             OpCode::OpNot => write!(f, "OP_NOT"),
-            OpCode::OpEqualEqual => write!(f, "OP_EQUAL"),
+            OpCode::OpEqualEqual => write!(f, "OP_EQUAL_EQUAL"),
             OpCode::OpGreater => write!(f, "OP_GREATER"),
             OpCode::OpLess => write!(f, "OP_LESS"),
             OpCode::OpPrint => write!(f, "OP_PRINT"),
@@ -94,6 +125,9 @@ impl std::fmt::Display for OpCode {
             OpCode::OpDefineLocal => write!(f, "OP_DEFINE_LOCAL"),
             OpCode::OpGetLocal => write!(f, "OP_GET_LOCAL"),
             OpCode::OpSetLocal => write!(f, "OP_SET_LOCAL"),
+
+            OpCode::OpJumpIfFalse => write!(f, "OP_JUMP_IF_FALSE"),
+            OpCode::OpJump => write!(f, "OP_JUMP"),
 
             OpCode::OpCall => write!(f, "OP_CALL"),
         }

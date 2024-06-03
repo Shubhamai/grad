@@ -103,6 +103,33 @@ impl Debug {
                 }
                 return offset + 2;
             }
+            chunk::VectorType::Code(chunk::OpCode::OpJump | chunk::OpCode::OpJumpIfFalse) => {
+                println!(
+                    "{:04} {}",
+                    offset.to_string().yellow(),
+                    instruction.to_string().red()
+                );
+                let jump = self.chunk.code[offset + 1];
+                match jump {
+                    chunk::VectorType::Constant(idx) => {
+                        println!(
+                            "{:04} {} {:20} | {}",
+                            offset.to_string().yellow(),
+                            instruction.to_string().red(),
+                            jump.to_string().green().italic(),
+                            self.chunk.constants[idx]
+                                .to_string()
+                                .purple()
+                                .magenta()
+                                .italic()
+                        );
+                    }
+                    _ => {
+                        // unreachable!();
+                    }
+                }
+                return offset + 2;
+            }
             chunk::VectorType::Constant(_) => {
                 return offset + 1;
             }
