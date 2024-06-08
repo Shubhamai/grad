@@ -2,3 +2,5 @@
 notes.txt
 .gitignore
 pkg/
+web/node_modules
+web/.next

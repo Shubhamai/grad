@@ -1,4 +1,6 @@
-// let a = 4;
-if (2 > 1) {
-    print("gg")
+if (2 == 2) {
+    print("gg");
+} else {
+    print(1);
+    print("ggg");
 }

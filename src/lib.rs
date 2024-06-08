@@ -33,3 +33,10 @@ pub fn run_source(src: &str) -> String {
 
     format!("{:?}", result)
 }
+
+#[test]
+fn test_run_source() {
+    let src = "let a = 1 + 2 * 3;print(a);";
+    let result = run_source(src);
+    assert_eq!(result, "Ok([Tensor(7)])");
+}

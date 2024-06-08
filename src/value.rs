@@ -8,6 +8,8 @@ pub enum ValueType {
     Boolean(bool),
     Nil,
     // Lists, Dicts, Tensors, etc.
+
+    JumpOffset(usize),
 }
 
 impl std::fmt::Display for ValueType {
@@ -18,6 +20,7 @@ impl std::fmt::Display for ValueType {
             ValueType::Identifier(s) => write!(f, "iden->{}", s),
             ValueType::Boolean(b) => write!(f, "bool->{}", b),
             ValueType::Nil => write!(f, "nil"),
+            ValueType::JumpOffset(j) => write!(f, "jmp->{}", j),
         }
     }
 }

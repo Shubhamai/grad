@@ -63,34 +63,6 @@ impl Chunk {
         self.constants.push(value);
         self.constants.len() - 1 // return the index of the constant
     }
-
-    pub fn write_jump(&mut self, op_code: OpCode, jump_to: usize) -> usize {
-        // Write the jump instruction with a placeholder offset
-        let offset = self.code.len(); // Placeholder offset
-        self.write(VectorType::Code(op_code));
-        self.add_constant(ValueType::Tensor(Tensor::from(jump_to as f64))); // Placeholder jump offset
-        offset // Return the offset to be patched later
-    }
-
-    pub fn patch_jump(&mut self, offset: usize) {
-        // Calculate the jump offset from the beginning of the code
-        let jump_offset = self.code.len() - offset - 1;
-        // Patch the jump instruction with the calculated offset
-        println!("Patching jump at offset {} with jump offset {}", offset, jump_offset);
-        // if let VectorType::Code(OpCode::OpJump) = self.code[offset].clone() {
-        //     if let VectorType::Constant(ValueType::Tensor(mut tensor)) = self.code[offset + 1].clone() {
-        //         tensor[0] = jump_offset as f64;
-        //         self.code[offset + 1] = VectorType::Constant(ValueType::Tensor(tensor));
-        //     }
-        // } else if let VectorType::Code(OpCode::OpJumpIfFalse) = self.code[offset].clone() {
-        //     if let VectorType::Constant(ValueType::Tensor(mut tensor)) = self.code[offset + 1].clone() {
-        //         tensor[0] = jump_offset as f64;
-        //         self.code[offset + 1] = VectorType::Constant(ValueType::Tensor(tensor));
-        //     }
-        // }
-    }
-
-    
 }
 
 ////////////////////////

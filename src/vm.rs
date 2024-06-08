@@ -156,6 +156,29 @@ impl VM {
                     let constant = get_constant!(self.read_byte());
                     push!(constant);
                 }
+                opcode!(OpJumpIfFalse) => {
+                    self.read_byte();
+                    let offset = self.read_byte();
+                    let value = self.peek(0);
+
+                    if let ValueType::Boolean(false) = value {
+                        if let VectorType::Constant(idx) = offset {
+                            if let ValueType::JumpOffset(offset) = self.read_constant(idx as usize)
+                            {
+                                self.ip = offset;
+                            }
+                        }
+                    }
+                }
+                opcode!(OpJump) => {
+                    self.read_byte();
+                    let offset = self.read_byte();
+                    if let VectorType::Constant(idx) = offset {
+                        if let ValueType::JumpOffset(offset) = self.read_constant(idx as usize) {
+                            self.ip = offset
+                        }
+                    }
+                }
                 opcode!(OpDefineGlobal) => {
                     let constant = get_constant!(self.read_byte());
                     let value = self.peek(0);
