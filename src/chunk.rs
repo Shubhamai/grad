@@ -31,6 +31,7 @@ pub enum OpCode {
 
     OpJumpIfFalse,
     OpJump,
+    OpLoop,
 
     OpCall,
 }
@@ -100,6 +101,7 @@ impl std::fmt::Display for OpCode {
 
             OpCode::OpJumpIfFalse => write!(f, "OP_JUMP_IF_FALSE"),
             OpCode::OpJump => write!(f, "OP_JUMP"),
+            OpCode::OpLoop => write!(f, "OP_LOOP"),
 
             OpCode::OpCall => write!(f, "OP_CALL"),
         }

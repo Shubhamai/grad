@@ -2,7 +2,7 @@
 
 use crate::{
     scanner::{Lexer, TokenType},
-    vm::{self},
+    vm,
 };
 use std::fmt;
 
@@ -17,6 +17,7 @@ pub enum ASTNode {
     Let(String, Vec<ASTNode>),
     Assign(String, Vec<ASTNode>),
     If(Vec<ASTNode>, Vec<ASTNode>, Option<Vec<ASTNode>>), // condition, then, else
+    While(Vec<ASTNode>, Vec<ASTNode>),                    // condition, body
     Print(Vec<ASTNode>),
     Block(Vec<ASTNode>), // depth, statements
 }
@@ -117,6 +118,14 @@ impl<'a> Parser<'a> {
                         None
                     };
                     ASTNode::If(vec![condition], then_branch, else_branch)
+                }
+                TokenType::WHILE => {
+                    self.lexer.next();
+                    assert_eq!(self.lexer.next().token_type, TokenType::LeftParen);
+                    let condition = self.parse_expression();
+                    assert_eq!(self.lexer.next().token_type, TokenType::RightParen);
+                    let body = self.parse_block();
+                    ASTNode::While(vec![condition], body)
                 }
                 TokenType::SEMICOLON => {
                     self.lexer.next();
@@ -445,6 +454,13 @@ impl fmt::Display for ASTNode {
                     write!(f, "}}")?;
                 }
                 write!(f, "")
+            }
+            ASTNode::While(condition, body) => {
+                write!(f, "while {} {{", condition[0])?;
+                for stmt in body {
+                    write!(f, "{}", stmt)?;
+                }
+                write!(f, "}}")
             }
             ASTNode::Op(head, rest) => {
                 write!(f, "({}", head)?;

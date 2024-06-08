@@ -103,7 +103,7 @@ impl Debug {
                 }
                 return offset + 2;
             }
-            chunk::VectorType::Code(chunk::OpCode::OpJump | chunk::OpCode::OpJumpIfFalse) => {
+            chunk::VectorType::Code(chunk::OpCode::OpJump | chunk::OpCode::OpJumpIfFalse | chunk::OpCode::OpLoop) => {
                 let current_location = self.chunk.code[offset + 1];
                 let jump_offset = self.chunk.code[offset + 2];
 

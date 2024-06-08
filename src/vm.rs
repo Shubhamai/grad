@@ -134,9 +134,11 @@ impl VM {
                     let a = pop!();
                     push!(ValueType::Boolean(a == b));
                 }
+                // TODO: Not working for now
                 opcode!(OpGreater) => {
                     let b = pop!();
                     let a = pop!();
+                    println!("a: {:?}", a > b);
                     push!(ValueType::Boolean(a > b));
                 }
                 opcode!(OpLess) => {
@@ -171,6 +173,15 @@ impl VM {
                     }
                 }
                 opcode!(OpJump) => {
+                    self.read_byte();
+                    let offset = self.read_byte();
+                    if let VectorType::Constant(idx) = offset {
+                        if let ValueType::JumpOffset(offset) = self.read_constant(idx as usize) {
+                            self.ip = offset
+                        }
+                    }
+                }
+                opcode!(OpLoop) => {
                     self.read_byte();
                     let offset = self.read_byte();
                     if let VectorType::Constant(idx) = offset {

@@ -1,6 +1,10 @@
-if (2 == 2) {
-    print("gg");
-} else {
-    print(1);
-    print("ggg");
-}
+//if (2 == 2) {
+//    print("gg");
+//} else {
+//    print(1);
+//    print("ggg");
+//}
+
+//while (3 > 2) {
+//   print("gg");
+//}

@@ -216,7 +216,6 @@ impl Compiler {
                 assert_eq!(cond.len(), 1);
                 self.visit(cond[0].clone());
 
-
                 let else_jump_offset = self.chunk.code.len();
                 write_op!(self.chunk, OpCode::OpJumpIfFalse);
                 add_con!(self.chunk, ValueType::JumpOffset(else_jump_offset));
@@ -239,8 +238,7 @@ impl Compiler {
                 write_op!(self.chunk, OpCode::OpPop);
 
                 let else_offset = self.chunk.code.len();
-                self.chunk.constants[else_jump_const_idx] =
-                    ValueType::JumpOffset(else_offset - 1);
+                self.chunk.constants[else_jump_const_idx] = ValueType::JumpOffset(else_offset - 1);
 
                 // Compile the "else" block if it exists
                 if let Some(els) = els {
@@ -249,6 +247,33 @@ impl Compiler {
 
                 let end_offset = self.chunk.code.len();
                 self.chunk.constants[jump_const_idx] = ValueType::JumpOffset(end_offset);
+            }
+            ASTNode::While(cond, body) => {
+                let loop_start = self.chunk.code.len();
+
+                assert_eq!(cond.len(), 1);
+                self.visit(cond[0].clone());
+
+                let exit_jump_offset = self.chunk.code.len();
+                write_op!(self.chunk, OpCode::OpJumpIfFalse);
+                add_con!(self.chunk, ValueType::JumpOffset(exit_jump_offset));
+                write_cons!(self.chunk, self.chunk.constants.len() - 1);
+                let exit_jump_const_idx = add_con!(self.chunk, ValueType::JumpOffset(0));
+                write_cons!(self.chunk, self.chunk.constants.len() - 1);
+                write_op!(self.chunk, OpCode::OpPop);
+
+                body.iter().for_each(|stmt| self.visit(stmt.clone()));
+
+                let loop_jump_offset = self.chunk.code.len();
+                write_op!(self.chunk, OpCode::OpLoop);
+                add_con!(self.chunk, ValueType::JumpOffset(loop_jump_offset));
+                write_cons!(self.chunk, self.chunk.constants.len() - 1);
+                add_con!(self.chunk, ValueType::JumpOffset(loop_start));
+                write_cons!(self.chunk, self.chunk.constants.len() - 1);
+                write_op!(self.chunk, OpCode::OpPop);
+
+                let exit_offset = self.chunk.code.len();
+                self.chunk.constants[exit_jump_const_idx] = ValueType::JumpOffset(exit_offset - 1);
             }
         }
     }
