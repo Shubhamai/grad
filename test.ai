@@ -1,22 +1,10 @@
-let a = 4;
+//if (2 == 2) {
+//    print("gg");
+//} else {
+//    print(1);
+//    print("ggg");
+//}
 
-{
-    let b = 5;
-    print(b);
-
-    {
-        let c = 10;
-        print(c);
-
-        let b = 353;
-        print(b);
-    }
-
-    print(b);
-    b = 11;
-    print(b);
-
-    a = 12;
-}
-
-print(a);
+//while (3 > 2) {
+//   print("gg");
+//}

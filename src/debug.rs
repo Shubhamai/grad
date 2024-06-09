@@ -103,6 +103,31 @@ impl Debug {
                 }
                 return offset + 2;
             }
+            chunk::VectorType::Code(chunk::OpCode::OpJump | chunk::OpCode::OpJumpIfFalse | chunk::OpCode::OpLoop) => {
+                let current_location = self.chunk.code[offset + 1];
+                let jump_offset = self.chunk.code[offset + 2];
+
+                if let chunk::VectorType::Constant(loc) = current_location {
+                    if let chunk::VectorType::Constant(jump) = jump_offset {
+                        println!(
+                            "{:04} {} | {}->{}",
+                            offset.to_string().yellow(),
+                            instruction.to_string().red(),
+                            self.chunk.constants[loc]
+                                .to_string()
+                                .purple()
+                                .magenta()
+                                .italic(),
+                            self.chunk.constants[jump]
+                                .to_string()
+                                .purple()
+                                .magenta()
+                                .italic(),
+                        );
+                    }
+                }
+                return offset + 2;
+            }
             chunk::VectorType::Constant(_) => {
                 return offset + 1;
             }

@@ -2,7 +2,7 @@
 
 use crate::{
     scanner::{Lexer, TokenType},
-    vm::{self},
+    vm,
 };
 use std::fmt;
 
@@ -16,6 +16,8 @@ pub enum ASTNode {
     Callee(String, Vec<ASTNode>), // function call with arguments
     Let(String, Vec<ASTNode>),
     Assign(String, Vec<ASTNode>),
+    If(Vec<ASTNode>, Vec<ASTNode>, Option<Vec<ASTNode>>), // condition, then, else
+    While(Vec<ASTNode>, Vec<ASTNode>),                    // condition, body
     Print(Vec<ASTNode>),
     Block(Vec<ASTNode>), // depth, statements
 }
@@ -103,6 +105,28 @@ impl<'a> Parser<'a> {
                         }
                     }
                 }
+                TokenType::IF => {
+                    self.lexer.next();
+                    assert_eq!(self.lexer.next().token_type, TokenType::LeftParen);
+                    let condition = self.parse_expression();
+                    assert_eq!(self.lexer.next().token_type, TokenType::RightParen);
+                    let then_branch = self.parse_block();
+                    let else_branch = if self.lexer.peek().token_type == TokenType::ELSE {
+                        self.lexer.next();
+                        Some(self.parse_block())
+                    } else {
+                        None
+                    };
+                    ASTNode::If(vec![condition], then_branch, else_branch)
+                }
+                TokenType::WHILE => {
+                    self.lexer.next();
+                    assert_eq!(self.lexer.next().token_type, TokenType::LeftParen);
+                    let condition = self.parse_expression();
+                    assert_eq!(self.lexer.next().token_type, TokenType::RightParen);
+                    let body = self.parse_block();
+                    ASTNode::While(vec![condition], body)
+                }
                 TokenType::SEMICOLON => {
                     self.lexer.next();
                     continue;
@@ -154,6 +178,13 @@ impl<'a> Parser<'a> {
             ASTNode::Op(op, vec![ASTNode::Identifier(identifier.clone()), expr])
         };
         Ok(ASTNode::Assign(identifier, vec![expr]))
+    }
+
+    fn parse_block(&mut self) -> Vec<ASTNode> {
+        assert_eq!(self.lexer.next().token_type, TokenType::LeftBrace);
+        let statements = self.parse();
+        assert_eq!(self.lexer.next().token_type, TokenType::RightBrace);
+        statements
     }
 
     fn parse_expression(&mut self) -> ASTNode {
@@ -408,6 +439,28 @@ impl fmt::Display for ASTNode {
             }
             ASTNode::Assign(identifier, expr) => {
                 write!(f, "{} = {}", identifier, expr[0])
+            }
+            ASTNode::If(condition, then_branch, else_branch) => {
+                write!(f, "if {} {{", condition[0])?;
+                for stmt in then_branch {
+                    write!(f, "{}", stmt)?;
+                }
+                write!(f, "}}")?;
+                if !else_branch.is_none() {
+                    write!(f, " else {{")?;
+                    for stmt in else_branch {
+                        write!(f, "{:?}", stmt)?;
+                    }
+                    write!(f, "}}")?;
+                }
+                write!(f, "")
+            }
+            ASTNode::While(condition, body) => {
+                write!(f, "while {} {{", condition[0])?;
+                for stmt in body {
+                    write!(f, "{}", stmt)?;
+                }
+                write!(f, "}}")
             }
             ASTNode::Op(head, rest) => {
                 write!(f, "({}", head)?;
