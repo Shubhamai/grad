@@ -1,3 +1,7 @@
+// https://brenocon.com/dean_perf.html
+// https://vercel.com/blog/latency-numbers-every-web-developer-should-know
+
+
 // Lines of Code
 
 use tokei::{Config, LanguageType, Languages};

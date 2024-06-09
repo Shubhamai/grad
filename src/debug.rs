@@ -1,16 +1,18 @@
-use crate::chunk;
+use crate::{chunk, interner::Interner, value::ValueType};
 use colored::*;
 
 pub struct Debug {
     name: String,
+    interner: Interner,
     chunk: chunk::Chunk,
 }
 
 impl Debug {
-    pub fn new(name: &str, chunk: chunk::Chunk) -> Self {
+    pub fn new(name: &str, chunk: chunk::Chunk, interner: Interner) -> Self {
         Self {
             name: name.to_string(),
             chunk,
+            interner,
         }
     }
 
@@ -63,25 +65,65 @@ impl Debug {
                 | chunk::OpCode::OpDefineGlobal
                 | chunk::OpCode::OpGetGlobal
                 | chunk::OpCode::OpSetGlobal
+                | chunk::OpCode::OpDefineLocal
+                | chunk::OpCode::OpGetLocal
+                | chunk::OpCode::OpSetLocal
                 | chunk::OpCode::OpCall,
             ) => {
                 let constant = self.chunk.code[offset + 1];
                 match constant {
-                    chunk::VectorType::Constant(idx) => {
+                    chunk::VectorType::Constant(idx) => match self.chunk.constants[idx] {
+                        ValueType::String(s) | ValueType::Identifier(s) => {
+                            println!(
+                                "{:04} {} {:20} | {}{}",
+                                offset.to_string().yellow(),
+                                instruction.to_string().red(),
+                                constant.to_string().green().italic(),
+                                "intr->".purple().magenta().italic(),
+                                self.interner.lookup(s).purple().magenta().italic()
+                            );
+                        }
+                        _ => {
+                            println!(
+                                "{:04} {} {:20} | {}",
+                                offset.to_string().yellow(),
+                                instruction.to_string().red(),
+                                constant.to_string().green().italic(),
+                                self.chunk.constants[idx]
+                                    .to_string()
+                                    .purple()
+                                    .magenta()
+                                    .italic()
+                            );
+                        }
+                    },
+                    _ => {
+                        unreachable!();
+                    }
+                }
+                return offset + 2;
+            }
+            chunk::VectorType::Code(chunk::OpCode::OpJump | chunk::OpCode::OpJumpIfFalse | chunk::OpCode::OpLoop) => {
+                let current_location = self.chunk.code[offset + 1];
+                let jump_offset = self.chunk.code[offset + 2];
+
+                if let chunk::VectorType::Constant(loc) = current_location {
+                    if let chunk::VectorType::Constant(jump) = jump_offset {
                         println!(
-                            "{:04} {} {:04} | {}",
+                            "{:04} {} | {}->{}",
                             offset.to_string().yellow(),
                             instruction.to_string().red(),
-                            constant.to_string().green().italic(),
-                            self.chunk.constants[idx]
+                            self.chunk.constants[loc]
                                 .to_string()
                                 .purple()
                                 .magenta()
-                                .italic()
+                                .italic(),
+                            self.chunk.constants[jump]
+                                .to_string()
+                                .purple()
+                                .magenta()
+                                .italic(),
                         );
-                    }
-                    _ => {
-                        println!("{:04} {} {:04}", offset, instruction, constant);
                     }
                 }
                 return offset + 2;

@@ -25,11 +25,18 @@ pub fn run_source(src: &str) -> String {
     let (bytecode, interner) = compiler.compile(out);
     println!("{:?}", bytecode);
 
-    let debug = debug::Debug::new("test", bytecode.clone());
+    let debug = debug::Debug::new("test", bytecode.clone(), interner.clone());
     debug.disassemble();
 
     let mut vm = vm::VM::init(bytecode, interner);
     let result = vm.run();
 
     format!("{:?}", result)
+}
+
+#[test]
+fn test_run_source() {
+    let src = "let a = 1 + 2 * 3;print(a);";
+    let result = run_source(src);
+    assert_eq!(result, "Ok([Tensor(7)])");
 }

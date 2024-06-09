@@ -1,4 +1,4 @@
-use crate::value::ValueType;
+use crate::{tensor::Tensor, value::ValueType};
 
 #[derive(Debug, Clone, Copy)]
 #[repr(u8)]
@@ -12,6 +12,8 @@ pub enum OpCode {
     OpSubtract,
     OpMultiply,
     OpDivide,
+    OpPower,
+
     OpNot,
     OpEqualEqual,
     OpGreater,
@@ -22,7 +24,14 @@ pub enum OpCode {
     OpDefineGlobal,
     OpGetGlobal,
     OpSetGlobal,
-    OpPower,
+
+    OpDefineLocal,
+    OpGetLocal,
+    OpSetLocal,
+
+    OpJumpIfFalse,
+    OpJump,
+    OpLoop,
 
     OpCall,
 }
@@ -71,11 +80,13 @@ impl std::fmt::Display for OpCode {
             OpCode::OpSubtract => write!(f, "OP_SUBTRACT"),
             OpCode::OpMultiply => write!(f, "OP_MULTIPLY"),
             OpCode::OpDivide => write!(f, "OP_DIVIDE"),
+            OpCode::OpPower => write!(f, "OP_POWER"),
+
             OpCode::OpNil => write!(f, "OP_NIL"),
             OpCode::OpTrue => write!(f, "OP_TRUE"),
             OpCode::OpFalse => write!(f, "OP_FALSE"),
             OpCode::OpNot => write!(f, "OP_NOT"),
-            OpCode::OpEqualEqual => write!(f, "OP_EQUAL"),
+            OpCode::OpEqualEqual => write!(f, "OP_EQUAL_EQUAL"),
             OpCode::OpGreater => write!(f, "OP_GREATER"),
             OpCode::OpLess => write!(f, "OP_LESS"),
             OpCode::OpPrint => write!(f, "OP_PRINT"),
@@ -83,7 +94,15 @@ impl std::fmt::Display for OpCode {
             OpCode::OpDefineGlobal => write!(f, "OP_DEFINE_GLOBAL"),
             OpCode::OpGetGlobal => write!(f, "OP_GET_GLOBAL"),
             OpCode::OpSetGlobal => write!(f, "OP_SET_GLOBAL"),
-            OpCode::OpPower => write!(f, "OP_POWER"),
+
+            OpCode::OpDefineLocal => write!(f, "OP_DEFINE_LOCAL"),
+            OpCode::OpGetLocal => write!(f, "OP_GET_LOCAL"),
+            OpCode::OpSetLocal => write!(f, "OP_SET_LOCAL"),
+
+            OpCode::OpJumpIfFalse => write!(f, "OP_JUMP_IF_FALSE"),
+            OpCode::OpJump => write!(f, "OP_JUMP"),
+            OpCode::OpLoop => write!(f, "OP_LOOP"),
+
             OpCode::OpCall => write!(f, "OP_CALL"),
         }
     }

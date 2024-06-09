@@ -1,4 +1,4 @@
-use std::{any::Any, clone, collections::HashMap};
+use std::collections::HashMap;
 use thiserror::Error;
 
 use crate::{
@@ -38,15 +38,12 @@ pub enum Result {
     RuntimeErr(String),
 }
 
-// write code to shrink chunk::VectorType::Code(chunk::OpCode::OpReturn) to Code(OpReturn)
-
 impl VM {
-    // pub(crate) fn init(chunk: Chunk) -> VM {
     pub(crate) fn init(chunk: Chunk, interner: Interner) -> VM {
         VM {
             chunk,
             ip: 0,
-            stack: core::array::from_fn(|i| ValueType::Nil),
+            stack: core::array::from_fn(|_| ValueType::Nil),
             stack_top: 0,
             interner,
             globals: HashMap::new(),
@@ -68,20 +65,18 @@ impl VM {
             };
         }
 
-        /// Macro to generate the opcode enum `opcode!(OpReturn)` to `chunk::VectorType::Code(chunk::OpCode::OpReturn)`
         macro_rules! opcode {
             ($op:ident) => {
                 chunk::VectorType::Code(chunk::OpCode::$op)
             };
         }
 
-        /// Macro to get the constant from the chunk
         macro_rules! get_constant {
             ($index:expr) => {
                 match $index {
                     chunk::VectorType::Constant(idx) => self.read_constant(idx as usize),
                     _ => {
-                        return Result::RuntimeErr("Invalid constant index".to_string());
+                        return Result::RuntimeErr(format!("Invalid constant '{}'", $index));
                     }
                 }
             };
@@ -139,9 +134,11 @@ impl VM {
                     let a = pop!();
                     push!(ValueType::Boolean(a == b));
                 }
+                // TODO: Not working for now
                 opcode!(OpGreater) => {
                     let b = pop!();
                     let a = pop!();
+                    println!("a: {:?}", a > b);
                     push!(ValueType::Boolean(a > b));
                 }
                 opcode!(OpLess) => {
@@ -161,6 +158,38 @@ impl VM {
                     let constant = get_constant!(self.read_byte());
                     push!(constant);
                 }
+                opcode!(OpJumpIfFalse) => {
+                    self.read_byte();
+                    let offset = self.read_byte();
+                    let value = self.peek(0);
+
+                    if let ValueType::Boolean(false) = value {
+                        if let VectorType::Constant(idx) = offset {
+                            if let ValueType::JumpOffset(offset) = self.read_constant(idx as usize)
+                            {
+                                self.ip = offset;
+                            }
+                        }
+                    }
+                }
+                opcode!(OpJump) => {
+                    self.read_byte();
+                    let offset = self.read_byte();
+                    if let VectorType::Constant(idx) = offset {
+                        if let ValueType::JumpOffset(offset) = self.read_constant(idx as usize) {
+                            self.ip = offset
+                        }
+                    }
+                }
+                opcode!(OpLoop) => {
+                    self.read_byte();
+                    let offset = self.read_byte();
+                    if let VectorType::Constant(idx) = offset {
+                        if let ValueType::JumpOffset(offset) = self.read_constant(idx as usize) {
+                            self.ip = offset
+                        }
+                    }
+                }
                 opcode!(OpDefineGlobal) => {
                     let constant = get_constant!(self.read_byte());
                     let value = self.peek(0);
@@ -179,11 +208,17 @@ impl VM {
                             if let Some(value) = value {
                                 push!(value.clone());
                             } else {
-                                return Result::RuntimeErr("Undefined global variable".to_string());
+                                return Result::RuntimeErr(format!(
+                                    "Undefined variable '{}'",
+                                    self.interner.lookup(idx)
+                                ));
                             }
                         }
                         _ => {
-                            return Result::RuntimeErr("Invalid global variable".to_string());
+                            return Result::RuntimeErr(format!(
+                                "Invalid global variable '{}'",
+                                constant
+                            ));
                         }
                     }
                 }
@@ -198,7 +233,36 @@ impl VM {
                             // TODO - only set the value if it exists
                         }
                         _ => {
-                            return Result::RuntimeErr("Invalid global variable".to_string());
+                            return Result::RuntimeErr(format!(
+                                "Invalid global variable '{}'",
+                                constant
+                            ));
+                        }
+                    }
+                }
+                opcode!(OpGetLocal) => {
+                    let slot = self.read_byte();
+
+                    match slot {
+                        VectorType::Constant(idx) => {
+                            let value = self.stack[idx as usize].clone();
+                            push!(value);
+                        }
+                        _ => {
+                            return Result::RuntimeErr(format!("Invalid slot '{}'", slot));
+                        }
+                    }
+                }
+                opcode!(OpSetLocal) => {
+                    let slot = self.read_byte();
+
+                    match slot {
+                        VectorType::Constant(idx) => {
+                            let value = self.peek(0);
+                            self.stack[idx as usize] = value;
+                        }
+                        _ => {
+                            return Result::RuntimeErr(format!("Invalid slot '{}'", slot));
                         }
                     }
                 }
@@ -231,14 +295,22 @@ impl VM {
                         }
                     }
                 }
-                VectorType::Constant(_) => {}
+                _ => {
+                    return {
+                        if let chunk::VectorType::Constant(idx) = instruction {
+                            let value = self.read_constant(idx as usize);
+                            println!("Constant: {:?}", value);
+                        }
+
+                        Result::RuntimeErr(format!("Invalid opcode '{}'", instruction))
+                    };
+                }
             }
         }
     }
 
-    // Reads the byte currently pointed at by ip and then advances the instruction pointer - book
     fn read_byte(&mut self) -> VectorType {
-        let byte = self.chunk.code[self.ip];
+        let byte = self.chunk.code[self.ip].clone();
         self.ip += 1;
         return byte;
     }

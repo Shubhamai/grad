@@ -1,42 +1,10 @@
-// x[0+2][1]
+//if (2 == 2) {
+//    print("gg");
+//} else {
+//    print(1);
+//    print("ggg");
+//}
 
-// x.relu(a.b(0+2), 2-1).max(0)/2
-// x.relu(0, 1, "sdfsd", false)
-// x.f(1 > 2, 3 != 3)
-
-
-let a = -4.0;
-let b = 2.0;
-let c = a + b;
-let d = a * b + b**3;
-c += c + 1;
-c += 1 + c + (-a);
-d += d * 2 + (b + a).relu();
-d += 3 * d + (b - a).relu();
-let e = c - d;
-let f = e**2;
-let g = f / 2.0;
-g += 10.0 / f;
-
-
-print(g); // prints 24.7041, the outcome of this forward pass
-g.backward();
-print(a.grad()); // prints 138.8338, i.e. the numerical value of dg/da
-print(b.grad()); // prints 138.8338, i.e. the numerical value of dg/da
-
-// f@g
-
-// 1 or 2
-
-// Op(PostfixOp(Call), [Identifier("a"), Callee([Calle("relu")], [])])
-
-// print(a);
-// print(a <= 4);
-
-// let breakfast = "beignets";
-//let beverage = "cafe au lait";
-//breakfast = "beignets with " + beverage;
-//print(breakfast);
-
-// Ops(PostfixOp(Call), [Identifier("x"), Ops(PostfixOp(Args), [Ops(PostfixOp(Call), [Identifier("a"), Ops(PostfixOp(Args), [Number(0.0)])]), Number(2.0)])])
-// Op(PostfixOp(Call), [Identifier("x"), Callee("f", [Op(BinaryOp(Gt), [Number(1.0), Number(2.0)])])])
+//while (3 > 2) {
+//   print("gg");
+//}

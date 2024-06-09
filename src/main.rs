@@ -88,21 +88,21 @@ pub fn run_source(src: &str) -> Result {
 
     let out = Parser::new(&mut lexer).parse();
     for stmt in out.iter() {
-        println!("{}", stmt);
+        println!("{:?}", stmt);
     }
     println!("-------------");
 
     let mut compiler = compiler::Compiler::new();
     let (bytecode, interner) = compiler.compile(out);
-    // println!("{:?}", bytecode);
+    println!("{:?}", bytecode);
 
-    let debug = debug::Debug::new("test", bytecode.clone());
+    let debug = debug::Debug::new("test", bytecode.clone(), interner.clone());
     debug.disassemble();
 
     let mut vm = vm::VM::init(bytecode, interner);
     let result = vm.run();
 
-    // println!("{:?}", result);
+    println!("{:?}", result);
 
     return result;
 }
@@ -134,6 +134,42 @@ mod tests {
         assert_eq!(
             out,
             Result::Ok(vec![ValueType::Tensor(Tensor::from(24.70408163265306))])
+        );
+    }
+
+    #[test]
+    fn test_scopes() {
+        let src = r#"
+        let a = 4;
+        {
+            let b = 5;
+            print(b);
+            {
+                let c = 10;
+                print(c);
+                let b = 353;
+                print(b);
+            }
+            print(b);
+            b = 11;
+            print(b);
+            a = 12;
+        }
+        print(a);
+        "#;
+
+        let out = run_source(&src);
+
+        assert_eq!(
+            out,
+            Result::Ok(vec![
+                ValueType::Tensor(Tensor::from(5.0)),
+                ValueType::Tensor(Tensor::from(10.0)),
+                ValueType::Tensor(Tensor::from(353.0)),
+                ValueType::Tensor(Tensor::from(5.0)),
+                ValueType::Tensor(Tensor::from(11.0)),
+                ValueType::Tensor(Tensor::from(12.0))
+            ])
         );
     }
 }
