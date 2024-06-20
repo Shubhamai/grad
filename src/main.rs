@@ -18,6 +18,9 @@ struct Args {
     /// File path (optional)
     #[clap(value_hint = clap::ValueHint::AnyPath, default_value = "")]
     script: String,
+
+    #[clap(short, long)]
+    debug: bool,
 }
 
 fn main() {
@@ -37,7 +40,7 @@ fn main() {
             Err(e) => panic!("Error reading file: {}", e),
         };
 
-        run_source(&src);
+        run_source(&src, args.debug);
     }
 }
 
@@ -83,26 +86,48 @@ fn main() {
 //     }
 // }
 
-pub fn run_source(src: &str) -> Result {
+pub fn run_source(src: &str, debug: bool) -> Result {
     let mut lexer = Lexer::new(src.to_string());
 
+    // print all tokens in single line separated by comma and space
+    if debug {
+        println!(
+            "{:?}",
+            lexer
+                .tokens
+                .iter()
+                .map(|t| t.token_type)
+                .rev()
+                .collect::<Vec<_>>()
+        );
+    };
+
     let out = Parser::new(&mut lexer).parse();
-    for stmt in out.iter() {
-        println!("{:?}", stmt);
+
+    if debug {
+        for stmt in out.iter() {
+            println!("{:?}", stmt);
+        }
     }
-    println!("-------------");
 
     let mut compiler = compiler::Compiler::new();
     let (bytecode, interner) = compiler.compile(out);
-    println!("{:?}", bytecode);
 
-    let debug = debug::Debug::new("test", bytecode.clone(), interner.clone());
-    debug.disassemble();
+    if debug {
+        println!("{:?}", bytecode);
+    }
+
+    let debugger = debug::Debug::new("test", bytecode.clone(), interner.clone());
+
+    if debug {
+        debugger.disassemble();
+    }
 
     let mut vm = vm::VM::init(bytecode, interner);
-    let result = vm.run();
 
-    println!("{:?}", result);
+    // let time = std::time::Instant::now();
+    let result = vm.run();
+    // println!("VM Elapsed: {:?}", time.elapsed());
 
     return result;
 }
@@ -129,7 +154,7 @@ mod tests {
                         print(g) // prints 24.7041, the outcome of this forward pass
                         "#;
 
-        let out = run_source(&src);
+        let out = run_source(&src, false);
 
         assert_eq!(
             out,
@@ -158,7 +183,7 @@ mod tests {
         print(a);
         "#;
 
-        let out = run_source(&src);
+        let out = run_source(&src, false);
 
         assert_eq!(
             out,

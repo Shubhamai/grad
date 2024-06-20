@@ -1,4 +1,3 @@
-// https://huyenchip.com/2021/09/07/a-friendly-introduction-to-machine-learning-compilers-and-optimizers.html
 
 use crate::{
     ast::{ASTNode, BinaryOp, Ops, PostfixOp, UnaryOp},
@@ -21,14 +20,33 @@ impl std::fmt::Display for Local {
     }
 }
 
+#[derive(Debug, Clone)]
+struct Function {
+    name: String,
+    arity: u8,
+    chunk: Chunk,
+}
+
+impl Function {
+    pub fn new(name: String, arity: u8) -> Self {
+        Self {
+            name,
+            arity,
+            chunk: Chunk::new(),
+        }
+    }
+}
+
 pub struct Compiler {
     chunk: Chunk,
     interner: Interner,
 
-    // local variables
     locals: Vec<Local>,
     local_count: usize,
     scope_depth: u8,
+
+    functions: Vec<Function>,
+    function_count: usize,
 }
 
 // write a macro that can take single or multiple opcodes and write them to the chunk, (without mentioning self.chunk)
@@ -58,6 +76,8 @@ impl Compiler {
             locals: Vec::new(),
             local_count: 0,
             scope_depth: 0,
+            functions: Vec::new(),
+            function_count: 0,
         }
     }
 
@@ -68,6 +88,23 @@ impl Compiler {
         self.chunk.write(VectorType::Code(OpCode::OpReturn));
 
         (self.chunk.clone(), self.interner.clone())
+    }
+
+    fn visit_function(&mut self, name: String, params: Vec<String>, body: Vec<ASTNode>) {
+        let function = Function::new(name.clone(), params.len() as u8);
+        self.functions.push(function);
+        self.function_count += 1;
+
+        // Compile function body
+        for stmt in body {
+            self.visit(stmt);
+        }
+
+        // Add return
+        self.chunk.write(VectorType::Code(OpCode::OpReturn));
+
+        let function_idx = self.chunk.add_constant(ValueType::Function(name));
+        write_cons!(self.chunk, function_idx);
     }
 
     fn visit(&mut self, node: ASTNode) {
@@ -225,7 +262,6 @@ impl Compiler {
                 write_op!(self.chunk, OpCode::OpPop);
 
                 then.iter().for_each(|stmt| {
-                    println!("stmt: {:?}", stmt);
                     self.visit(stmt.clone())
                 });
 
@@ -274,6 +310,9 @@ impl Compiler {
 
                 let exit_offset = self.chunk.code.len();
                 self.chunk.constants[exit_jump_const_idx] = ValueType::JumpOffset(exit_offset - 1);
+            }
+            ASTNode::Function(name, params, body) => {
+                self.visit_function(name, params, body);
             }
         }
     }

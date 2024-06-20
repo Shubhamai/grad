@@ -1,5 +1,3 @@
-// Pratt parser for parsing expressions from https://matklad.github.io/2020/04/13/simple-but-powerful-pratt-parsing.html
-
 use crate::{
     scanner::{Lexer, TokenType},
     vm,
@@ -19,6 +17,7 @@ pub enum ASTNode {
     If(Vec<ASTNode>, Vec<ASTNode>, Option<Vec<ASTNode>>), // condition, then, else
     While(Vec<ASTNode>, Vec<ASTNode>),                    // condition, body
     Print(Vec<ASTNode>),
+    Function(String, Vec<String>, Vec<ASTNode>),
     Block(Vec<ASTNode>), // depth, statements
 }
 
@@ -60,7 +59,7 @@ pub enum Ops {
 }
 
 //////////////////////////////
-/// Parser
+/// Recursive Descent Parser
 //////////////////////////////
 
 pub struct Parser<'a> {
@@ -80,6 +79,7 @@ impl<'a> Parser<'a> {
             let statement = match self.lexer.peek().token_type {
                 TokenType::PRINT => self.parse_print(),
                 TokenType::LET => self.parse_let(),
+                TokenType::FN => self.parse_function(),
                 TokenType::LeftBrace => {
                     self.lexer.next();
                     let statements = self.parse();
@@ -90,12 +90,11 @@ impl<'a> Parser<'a> {
                 // contains equal pr +=, -=, *=, /=
                 TokenType::Identifier
                     if self.lexer.peek_n_type(2).contains(&TokenType::EQUAL)
-                        | self.lexer.peek_n_type(2).contains(&TokenType::PlusEqual)
+                        || self.lexer.peek_n_type(2).contains(&TokenType::PlusEqual)
                         || self.lexer.peek_n_type(2).contains(&TokenType::MinusEqual)
                         || self.lexer.peek_n_type(2).contains(&TokenType::StarEqual)
                         || self.lexer.peek_n_type(2).contains(&TokenType::SlashEqual) =>
                 {
-                    // self.parse_assign()
                     match self.parse_assign() {
                         Ok(ast) => ast,
                         Err(e) => {
@@ -153,6 +152,22 @@ impl<'a> Parser<'a> {
         assert_eq!(self.lexer.next().token_type, TokenType::EQUAL);
         let expr = self.parse_expression();
         ASTNode::Let(identifier, vec![expr])
+    }
+
+    fn parse_function(&mut self) -> ASTNode {
+        self.lexer.next();
+        let name = self.lexer.next().lexeme;
+        assert_eq!(self.lexer.next().token_type, TokenType::LeftParen);
+        let mut params = vec![];
+        while self.lexer.peek().token_type != TokenType::RightParen {
+            params.push(self.lexer.next().lexeme);
+            if self.lexer.peek().token_type == TokenType::COMMA {
+                self.lexer.next();
+            }
+        }
+        self.lexer.next(); // consume RightParen
+        let body = self.parse_block();
+        ASTNode::Function(name, params, body)
     }
 
     fn parse_assign(&mut self) -> Result<ASTNode, vm::Result> {
@@ -323,16 +338,6 @@ fn expr_bp(lexer: &mut Lexer, min_bp: u8) -> ASTNode {
             }
             lexer.next();
 
-            // lhs =
-            // if op == '?' {
-            //     let mhs = expr_bp(lexer, 0);
-            //     assert_eq!(lexer.next(), Token::Op(':'));
-            //     let rhs = expr_bp(lexer, r_bp);
-            //     S::Cons(op, vec![lhs, mhs, rhs])
-            // } else {
-            //     let rhs = expr_bp(lexer, r_bp);
-            //     S::Cons(op, vec![lhs, rhs])
-            // };
             let rhs = expr_bp(lexer, r_bp);
             lhs = ASTNode::Op(op, vec![lhs, rhs]);
             continue;
@@ -379,6 +384,8 @@ fn infix_binding_power(op: Ops) -> Option<(u8, u8)> {
 
 ////////////////////////////////////////
 //////// Display for Ops & AST /////////
+////////////////////////////////////////
+
 use colored::*;
 
 impl fmt::Display for Ops {
@@ -402,7 +409,6 @@ impl fmt::Display for Ops {
             Ops::PostfixOp(PostfixOp::Index) => write!(f, "["),
             Ops::PostfixOp(PostfixOp::Call) => write!(f, "."),
             Ops::PostfixOp(PostfixOp::StarStar) => write!(f, "**"),
-            // Ops::PostfixOp(PostfixOp::Args) => write!(f, ","),
         }
     }
 }
@@ -446,10 +452,10 @@ impl fmt::Display for ASTNode {
                     write!(f, "{}", stmt)?;
                 }
                 write!(f, "}}")?;
-                if !else_branch.is_none() {
+                if let Some(else_branch) = else_branch {
                     write!(f, " else {{")?;
                     for stmt in else_branch {
-                        write!(f, "{:?}", stmt)?;
+                        write!(f, "{}", stmt)?;
                     }
                     write!(f, "}}")?;
                 }
@@ -468,6 +474,20 @@ impl fmt::Display for ASTNode {
                     write!(f, " {}", s)?
                 }
                 write!(f, ")")
+            }
+            ASTNode::Function(name, params, body) => {
+                write!(f, "fn {}(", name)?;
+                for (i, param) in params.iter().enumerate() {
+                    if i > 0 {
+                        write!(f, ", ")?;
+                    }
+                    write!(f, "{}", param)?;
+                }
+                write!(f, ") {{")?;
+                for stmt in body {
+                    write!(f, "{}", stmt)?;
+                }
+                write!(f, "}}")
             }
         }
     }
@@ -511,9 +531,6 @@ mod tests {
         let s = expr("--f @ g");
         assert_eq!(s, "(@ (- (- f)) g)");
 
-        // let s = expr(r""sfsad"+"sdf"--4");
-        // assert_eq!(s, "(+ \"sfsad\" \"sdf\" (- (- 4))");
-
         let s = expr("-!9");
         assert_eq!(s, "(- (! 9))");
 
@@ -546,17 +563,8 @@ mod tests {
 
         let s = expr("--1");
         assert_eq!(s, "(- (- 1))");
-
-        // let s = expr(
-        //     "a ? b :
-        //      c ? d
-        //      : e",
-        // );
-        // assert_eq!(s, "(? a b (? c d e))");
-
-        // let s = expr("a = 0 ? b : c = d");
-        // assert_eq!(s, "(= a (= (? 0 b c) d))")
     }
+
     #[test]
     fn test_parser() {
         fn parse(source: &str) -> String {
@@ -582,5 +590,9 @@ mod tests {
 
         let s = parse("a *= (5 != 4);");
         assert_eq!(s, "a = (* a (!= 5 4))");
+
+        // function definition test
+        let s = parse("fn add(a, b) { a + b; }");
+        assert_eq!(s, "fn add(a, b) {(+ a b)}");
     }
 }

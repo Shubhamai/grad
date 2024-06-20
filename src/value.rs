@@ -8,19 +8,36 @@ pub enum ValueType {
     Boolean(bool),
     Nil,
     // Lists, Dicts, Tensors, etc.
-
     JumpOffset(usize),
+
+    Function(String),
 }
 
-impl std::fmt::Display for ValueType {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+// impl std::fmt::Display for ValueType {
+//     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+//         match self {
+//             ValueType::Tensor(n) => write!(f, "{}", n),
+//             ValueType::String(s) => write!(f, "{}", s),
+//             ValueType::Identifier(s) => write!(f, "iden->{}", s),
+//             ValueType::Boolean(b) => write!(f, "{}", b),
+//             ValueType::Nil => write!(f, "nil"),
+//             ValueType::JumpOffset(j) => write!(f, "jmp->{}", j),
+//             ValueType::Function(s) => write!(f, "fn->{}", s),
+//         }
+//     }
+// }
+
+// impl custom display for ValueType which also takes interner
+impl ValueType {
+    pub fn display(&self, interner: &crate::interner::Interner) -> String {
         match self {
-            ValueType::Tensor(n) => write!(f, "tnsr->{}", n),
-            ValueType::String(s) => write!(f, "str->{}", s),
-            ValueType::Identifier(s) => write!(f, "iden->{}", s),
-            ValueType::Boolean(b) => write!(f, "bool->{}", b),
-            ValueType::Nil => write!(f, "nil"),
-            ValueType::JumpOffset(j) => write!(f, "jmp->{}", j),
+            ValueType::Tensor(n) => format!("{}", n),
+            ValueType::String(s) => interner.lookup(*s).to_string(),
+            ValueType::Identifier(s) => interner.lookup(*s).to_string(),
+            ValueType::Boolean(b) => format!("{}", b),
+            ValueType::Nil => format!("nil"),
+            ValueType::JumpOffset(j) => format!("jmp->{}", j),
+            ValueType::Function(s) => format!("fn->{}", s),
         }
     }
 }

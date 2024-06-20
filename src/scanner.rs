@@ -166,7 +166,7 @@ pub struct Token {
 }
 
 pub struct Lexer {
-    tokens: Vec<Token>,
+    pub tokens: Vec<Token>,
 }
 
 impl Lexer {

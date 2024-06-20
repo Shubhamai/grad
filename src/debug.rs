@@ -90,7 +90,7 @@ impl Debug {
                                 instruction.to_string().red(),
                                 constant.to_string().green().italic(),
                                 self.chunk.constants[idx]
-                                    .to_string()
+                                    .display(&self.interner)
                                     .purple()
                                     .magenta()
                                     .italic()
@@ -114,12 +114,12 @@ impl Debug {
                             offset.to_string().yellow(),
                             instruction.to_string().red(),
                             self.chunk.constants[loc]
-                                .to_string()
+                                .display(&self.interner)
                                 .purple()
                                 .magenta()
                                 .italic(),
                             self.chunk.constants[jump]
-                                .to_string()
+                                .display(&self.interner)
                                 .purple()
                                 .magenta()
                                 .italic(),

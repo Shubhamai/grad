@@ -1,4 +1,6 @@
-use crate::{tensor::Tensor, value::ValueType};
+/// This module contains the implementation of the Chunk struct and its methods.
+/// The Chunk struct is used to store the bytecode and the constants.
+use crate::value::ValueType;
 
 #[derive(Debug, Clone, Copy)]
 #[repr(u8)]
@@ -44,6 +46,7 @@ pub enum VectorType {
 
 #[derive(Debug, Clone)]
 pub struct Chunk {
+    /// VectorType is either a index to the constants or an OpCode, see `VectorType` enum
     pub code: Vec<VectorType>,
     pub constants: Vec<ValueType>,
 }

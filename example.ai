@@ -2,6 +2,7 @@
 // https://github.com/waveworks-ai/fl
 // https://www.reddit.com/r/MachineLearning/comments/1102t34/d_have_their_been_any_attempts_to_create_a/
 // https://arogozhnikov.github.io/2023/12/28/fastest-autograd.html
+// https://huyenchip.com/2021/09/07/a-friendly-introduction-to-machine-learning-compilers-and-optimizers.html
 
 // fun addPair(a, b) {
 //   return a + b;

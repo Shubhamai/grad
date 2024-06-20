@@ -10,6 +10,11 @@ use crate::{
 
 const STACK_MAX: usize = 256;
 
+struct CallFrame {
+    ip: usize,
+    stack_top: usize,
+}
+
 pub(crate) struct VM {
     pub chunk: Chunk,
 
@@ -24,6 +29,9 @@ pub(crate) struct VM {
     pub interner: Interner,
 
     globals: HashMap<StringObjIdx, ValueType>,
+
+    call_frames: Vec<CallFrame>,
+    frame_index: usize,
 }
 
 #[derive(Debug, PartialEq, Error)]
@@ -40,6 +48,7 @@ pub enum Result {
 
 impl VM {
     pub(crate) fn init(chunk: Chunk, interner: Interner) -> VM {
+        // TODO: serialize and cache chunk and interner and save it as a file hash
         VM {
             chunk,
             ip: 0,
@@ -47,6 +56,8 @@ impl VM {
             stack_top: 0,
             interner,
             globals: HashMap::new(),
+            call_frames: Vec::new(),
+            frame_index: 0,
         }
     }
 
@@ -138,8 +149,8 @@ impl VM {
                 opcode!(OpGreater) => {
                     let b = pop!();
                     let a = pop!();
-                    println!("a: {:?}", a > b);
-                    push!(ValueType::Boolean(a > b));
+                    println!("a = {:?}, b = {:?}", a, b);
+                    push!(ValueType::Boolean(b > a));
                 }
                 opcode!(OpLess) => {
                     let b = pop!();
@@ -148,8 +159,9 @@ impl VM {
                 }
                 opcode!(OpPrint) => {
                     let value = pop!();
+
                     print_outputs.push(value.clone());
-                    println!("{}", value)
+                    println!("{}", value.display(&self.interner));
                 }
                 opcode!(OpPop) => {
                     pop!();
@@ -217,7 +229,7 @@ impl VM {
                         _ => {
                             return Result::RuntimeErr(format!(
                                 "Invalid global variable '{}'",
-                                constant
+                                constant.display(&self.interner)
                             ));
                         }
                     }
@@ -235,7 +247,7 @@ impl VM {
                         _ => {
                             return Result::RuntimeErr(format!(
                                 "Invalid global variable '{}'",
-                                constant
+                                constant.display(&self.interner)
                             ));
                         }
                     }
