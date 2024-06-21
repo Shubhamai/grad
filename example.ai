@@ -4,6 +4,18 @@
 // https://arogozhnikov.github.io/2023/12/28/fastest-autograd.html
 // https://huyenchip.com/2021/09/07/a-friendly-introduction-to-machine-learning-compilers-and-optimizers.html
 
+// from micrograd
+
+// everything is a tensor and autograd tracks it
+// built-in support of einops, and common layers (relu, attention, linear...)
+// with syntax highlighting, online playground, ide integration, repl
+
+// ast optimizer using gpt/llama perhaps ? ( experiment )
+// Q: optimize this ast and only return the answer and nothing else `(. x (f (> 1 2) (!= 3 3)))`
+// AI: (. x (f false false))
+
+
+
 // fun addPair(a, b) {
 //   return a + b;
 // }

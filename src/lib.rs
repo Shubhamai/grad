@@ -11,6 +11,8 @@ mod vm;
 use crate::{ast::Parser, scanner::Lexer};
 use wasm_bindgen::prelude::*;
 
+
+/// `wasm-pack build -t web`
 #[wasm_bindgen]
 pub fn run_source(src: &str) -> String {
     let mut lexer = Lexer::new(src.to_string());

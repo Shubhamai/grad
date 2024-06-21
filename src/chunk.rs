@@ -35,7 +35,7 @@ pub enum OpCode {
     OpJump,
     OpLoop,
 
-    OpCall,
+    // OpCall,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -106,7 +106,7 @@ impl std::fmt::Display for OpCode {
             OpCode::OpJump => write!(f, "OP_JUMP"),
             OpCode::OpLoop => write!(f, "OP_LOOP"),
 
-            OpCode::OpCall => write!(f, "OP_CALL"),
+            // OpCode::OpCall => write!(f, "OP_CALL"),
         }
     }
 }

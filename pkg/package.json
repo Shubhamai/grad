@@ -1,0 +1,15 @@
+{
+  "name": "ai",
+  "description": "A programming language with built-in autograd",
+  "version": "0.1.0",
+  "files": [
+    "ai_bg.wasm",
+    "ai.js",
+    "ai.d.ts"
+  ],
+  "module": "ai.js",
+  "types": "ai.d.ts",
+  "sideEffects": [
+    "./snippets/*"
+  ]
+}

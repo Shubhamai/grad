@@ -149,8 +149,7 @@ impl VM {
                 opcode!(OpGreater) => {
                     let b = pop!();
                     let a = pop!();
-                    println!("a = {:?}, b = {:?}", a, b);
-                    push!(ValueType::Boolean(b > a));
+                    push!(ValueType::Boolean(a > b));
                 }
                 opcode!(OpLess) => {
                     let b = pop!();
@@ -278,35 +277,35 @@ impl VM {
                         }
                     }
                 }
-                opcode!(OpCall) => {
-                    let callee = self.read_byte();
-                    let caller = pop!();
+                // opcode!(OpCall) => {
+                //     let callee = self.read_byte();
+                //     let caller = pop!();
 
-                    let constant = get_constant!(callee);
-                    let str_idx = match constant {
-                        ValueType::Identifier(idx) => idx,
-                        _ => {
-                            return Result::RuntimeErr("Invalid function".to_string());
-                        }
-                    };
-                    let calle_str = self.interner.lookup(str_idx);
+                //     let constant = get_constant!(callee);
+                //     let str_idx = match constant {
+                //         ValueType::Identifier(idx) => idx,
+                //         _ => {
+                //             return Result::RuntimeErr("Invalid function".to_string());
+                //         }
+                //     };
+                //     let calle_str = self.interner.lookup(str_idx);
 
-                    let tensor = match caller {
-                        ValueType::Tensor(tensor) => tensor,
-                        _ => {
-                            return Result::RuntimeErr("Invalid function".to_string());
-                        }
-                    };
+                //     let tensor = match caller {
+                //         ValueType::Tensor(tensor) => tensor,
+                //         _ => {
+                //             return Result::RuntimeErr("Invalid function".to_string());
+                //         }
+                //     };
 
-                    match calle_str {
-                        "relu" => push!(ValueType::Tensor(Tensor::from(tensor.relu()))),
-                        "backward" => tensor.backward(),
-                        "grad" => push!(ValueType::Tensor(Tensor::from(tensor.gradient()))),
-                        _ => {
-                            return Result::RuntimeErr("Undefined function. Currently only supports relu, backward and grad".to_string());
-                        }
-                    }
-                }
+                //     match calle_str {
+                //         "relu" => push!(ValueType::Tensor(Tensor::from(tensor.relu()))),
+                //         "backward" => tensor.backward(),
+                //         "grad" => push!(ValueType::Tensor(Tensor::from(tensor.gradient()))),
+                //         _ => {
+                //             return Result::RuntimeErr("Undefined function. Currently only supports relu, backward and grad".to_string());
+                //         }
+                //     }
+                // }
                 _ => {
                     return {
                         if let chunk::VectorType::Constant(idx) = instruction {

@@ -68,7 +68,7 @@ impl Debug {
                 | chunk::OpCode::OpDefineLocal
                 | chunk::OpCode::OpGetLocal
                 | chunk::OpCode::OpSetLocal
-                | chunk::OpCode::OpCall,
+                // | chunk::OpCode::OpCall,
             ) => {
                 let constant = self.chunk.code[offset + 1];
                 match constant {

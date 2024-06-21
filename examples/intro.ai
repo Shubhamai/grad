@@ -11,6 +11,8 @@ if (a > 1.0) {
     print("a is less than 1");
 }
 
-//while (3 > 2) {
-//   print("gg");
-//}
+let i = 0;
+while (10 > i) {
+    print(i);
+    i += 1;
+}
