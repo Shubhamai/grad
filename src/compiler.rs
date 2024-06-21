@@ -109,9 +109,20 @@ impl Compiler {
 
     fn visit(&mut self, node: ASTNode) {
         match node {
-            ASTNode::Number(n) => {
+            // ASTNode::Number(n) => {
+            //     write_op!(self.chunk, OpCode::OpConstant);
+            //     // add_con!(self.chunk, ValueType::Tensor(Tensor::from(n)));
+            //     add_con!(self.chunk, ValueType::Float(n));
+            //     write_cons!(self.chunk, self.chunk.constants.len() - 1);
+            // }
+            ASTNode::IntNumber(n) => {
                 write_op!(self.chunk, OpCode::OpConstant);
-                add_con!(self.chunk, ValueType::Tensor(Tensor::from(n)));
+                add_con!(self.chunk, ValueType::Integer(n));
+                write_cons!(self.chunk, self.chunk.constants.len() - 1);
+            }
+            ASTNode::FloatNumber(n) => {
+                write_op!(self.chunk, OpCode::OpConstant);
+                add_con!(self.chunk, ValueType::Float(n));
                 write_cons!(self.chunk, self.chunk.constants.len() - 1);
             }
             ASTNode::Boolean(b) => {
@@ -175,9 +186,11 @@ impl Compiler {
                         write_op!(self.chunk, OpCode::OpPower);
                     }
                     Ops::PostfixOp(PostfixOp::Call) => {
-                        write_op!(self.chunk, OpCode::OpCall);
-                        self.chunk
-                            .write(VectorType::Constant(self.chunk.constants.len() - 1));
+                        panic!("Call not implemented");
+
+                        // write_op!(self.chunk, OpCode::OpCall);
+                        // self.chunk
+                        //     .write(VectorType::Constant(self.chunk.constants.len() - 1));
                         // TODO: need for testing for this - a.relu(c.relu()), a.relu().relu()
                     }
                     Ops::UnaryOp(UnaryOp::Not) | Ops::PostfixOp(PostfixOp::Index) => todo!(),

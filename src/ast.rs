@@ -6,7 +6,9 @@ use std::fmt;
 
 #[derive(Debug, Clone)]
 pub enum ASTNode {
-    Number(f64),
+    // Number(f64),
+    IntNumber(i64),
+    FloatNumber(f64),
     Identifier(String),
     Boolean(bool),
     String(String),
@@ -215,7 +217,9 @@ fn expr_bp(lexer: &mut Lexer, min_bp: u8) -> ASTNode {
     let current_token = lexer.next();
 
     let mut lhs = match current_token.token_type {
-        TokenType::Number(it) => ASTNode::Number(it),
+        // TokenType::Number(it) => ASTNode::Number(it),
+        TokenType::IntNumber(it) => ASTNode::IntNumber(it),
+        TokenType::FloatNumber(it) => ASTNode::FloatNumber(it),
         TokenType::Identifier => ASTNode::Identifier(current_token.lexeme),
         TokenType::Boolean(it) => ASTNode::Boolean(it),
         TokenType::String => ASTNode::String(current_token.lexeme),
@@ -416,7 +420,9 @@ impl fmt::Display for Ops {
 impl fmt::Display for ASTNode {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            ASTNode::Number(i) => write!(f, "{}", i.to_string().blue()),
+            // ASTNode::Number(i) => write!(f, "{}", i.to_string().blue()),
+            ASTNode::IntNumber(i) => write!(f, "{}", i.to_string().blue()),
+            ASTNode::FloatNumber(i) => write!(f, "{}", i.to_string().blue()),
             ASTNode::Identifier(s) => write!(f, "{}", s.red()),
             ASTNode::Boolean(b) => write!(f, "{}", b.to_string().yellow()),
             ASTNode::String(s) => write!(f, "{}", s.yellow()),
