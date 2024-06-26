@@ -3,8 +3,10 @@
 
 use std::collections::HashMap;
 
+use serde::{Deserialize, Serialize};
+
 pub type StringObjIdx = usize;
-#[derive(Default, Debug, Clone)]
+#[derive(Default, Debug, Clone, Serialize, Deserialize)]
 pub struct Interner {
     pub map: HashMap<String, usize>,
     vec: Vec<String>,
