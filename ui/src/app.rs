@@ -12,11 +12,11 @@ use grad::{
 };
 
 use eframe::egui;
+use egui::RichText;
 use std::collections::HashMap;
 
 #[derive(serde::Deserialize, serde::Serialize)]
 struct CustomLanguage;
-
 
 #[derive(serde::Deserialize, serde::Serialize, Clone)]
 struct DisassembledOutput {
@@ -80,8 +80,22 @@ impl Default for CustomLanguageDemo {
             custom_lang: CustomLanguage,
             code: String::new(),
             examples: vec![
-                ("Hello World".to_string(), "print(1)".to_string()),
-                ("dfds".to_string(), "45354345".to_string()),
+                (
+                    "Hello World".to_string(),
+                    r#"print("Hello World")"#.to_string(),
+                ),
+                (
+                    "Micro".to_string(),
+                    "let a = -4.0;
+let b = 2.0;
+let c = a + b;
+let d = a * b + b**3;
+c += c + 1;
+c += 1 + c + (-a);
+print(c);
+                    "
+                    .to_string(),
+                ),
             ],
             selected_example: 0,
             ast: None,
@@ -105,7 +119,11 @@ impl eframe::App for CustomLanguageDemo {
             .resizable(true)
             .default_width(left_panel_width)
             .show(ctx, |ui| {
-                ui.heading("Code Editor");
+                use egui::special_emojis::GITHUB;
+                ui.hyperlink_to(
+                    RichText::new(format!("{GITHUB} grad")).size(16.),
+                    "https://github.com/shubhamai/grad",
+                );
                 ui.add_space(10.0);
 
                 ui.horizontal(|ui| {
@@ -129,7 +147,8 @@ impl eframe::App for CustomLanguageDemo {
                 let response = ui.add(
                     egui::TextEdit::multiline(&mut self.code)
                         .desired_width(f32::INFINITY)
-                        .desired_rows(25),
+                        .desired_rows(25)
+                        .code_editor(),
                 );
 
                 // if response.changed() {
@@ -138,16 +157,18 @@ impl eframe::App for CustomLanguageDemo {
 
                 ui.add_space(10.0);
 
-                if ui.button("Run").clicked() {
+                if ui.button(RichText::new("Run").size(16.)).clicked() {
                     self.update_output();
                 }
+
+                ui.add_space(10.0);
 
                 // if ctrl+enter is pressed, run the code
                 // if ui.input(|i| i.key_down(egui::Key::Enter).ctrl()).clicked() {
                 //     self.update_output();
                 // }
 
-                ui.heading("Execution Result");
+                ui.heading(RichText::new("Execution Result").strong().size(16.));
                 ui.add_space(10.0);
                 ui.label(&self.result);
             });
@@ -159,7 +180,8 @@ impl eframe::App for CustomLanguageDemo {
                 .resizable(true)
                 .default_height(top_panel_height)
                 .show_inside(ui, |ui| {
-                    ui.heading("Abstract Syntax Tree");
+                    ui.heading(RichText::new("Abstract Syntax Tree").strong().size(16.));
+
                     ui.add_space(10.0);
                     if let Some(_ast) = &self.ast {
                         let mut ast_ascii = String::new();
@@ -174,7 +196,9 @@ impl eframe::App for CustomLanguageDemo {
                 });
 
             // Bottom right (Disassembled Output)
-            ui.heading("Disassembled Output");
+
+            ui.heading(RichText::new("Disassembled Output").strong().size(16.));
+
             ui.add_space(10.0);
             if let Some(_disassembled) = &self.disassembled {
                 let debug = debug::Debug::new(
@@ -217,11 +241,11 @@ impl CustomLanguageDemo {
                 self.result = self.custom_lang.execute(disassembled_output);
 
                 // Populate constants (replace this with actual constant extraction)
-                self.constants.clear();
-                self.constants
-                    .insert("CONST_1".to_string(), "42".to_string());
-                self.constants
-                    .insert("CONSTs_2".to_string(), "Hello, World!".to_string());
+                // self.constants.clear();
+                // self.constants
+                //     .insert("CONST_1".to_string(), "42".to_string());
+                // self.constants
+                //     .insert("CONSTs_2".to_string(), "Hello, World!".to_string());
             }
             Err(e) => {
                 self.ast = None;

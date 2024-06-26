@@ -1,0 +1,18 @@
+print("Hello, world!");
+
+let a = 4.0;
+let b = 2**2;
+
+print(a + b);
+
+if (a > 1.0) {
+    print("a is greater than 1");
+} else {
+    print("a is less than 1");
+}
+
+let i = 0;
+while (10 > i) {
+    print(i);
+    i += 1;
+}
