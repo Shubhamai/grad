@@ -15,7 +15,7 @@ struct CallFrame {
     stack_top: usize,
 }
 
-pub(crate) struct VM {
+pub struct VM {
     pub chunk: Chunk,
 
     // instruction pointer
@@ -37,7 +37,7 @@ pub(crate) struct VM {
 #[derive(Debug, PartialEq, Error)]
 pub enum Result {
     #[error("Ok")]
-    Ok(Vec<ValueType>),
+    Ok(Vec<String>),
 
     #[error("Compile error : {0}")]
     CompileErr(String),
@@ -47,7 +47,7 @@ pub enum Result {
 }
 
 impl VM {
-    pub(crate) fn init(chunk: Chunk, interner: Interner) -> VM {
+    pub fn init(chunk: Chunk, interner: Interner) -> VM {
         // TODO: serialize and cache chunk and interner and save it as a file hash
         VM {
             chunk,
@@ -62,7 +62,7 @@ impl VM {
     }
 
     pub fn run(&mut self) -> Result {
-        let mut print_outputs = Vec::new();
+        let mut print_outputs: Vec<String> = Vec::new();
 
         macro_rules! push {
             ($value:expr) => {
@@ -159,7 +159,7 @@ impl VM {
                 opcode!(OpPrint) => {
                     let value = pop!();
 
-                    print_outputs.push(value.clone());
+                    print_outputs.push(value.display(&self.interner));
                     println!("{}", value.display(&self.interner));
                 }
                 opcode!(OpPop) => {

@@ -1,8 +1,8 @@
 [package]
-name = "ai"
+name = "grad"
 version = "0.1.0"
 edition = "2021"
-description = "A programming language with built-in autograd"
+description = "A programming language"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -13,6 +13,4 @@ wasm-bindgen = "0.2.92"
 tokei = "12.1.2"
 thiserror = "1.0.59"
 colored = "2.1.0"
-
-[lib]
-crate-type = ["cdylib"]
+serde = "1.0.203"

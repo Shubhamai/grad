@@ -1,6 +1,8 @@
+use serde::{Deserialize, Serialize};
+
 use crate::{interner::StringObjIdx, tensor::Tensor};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ValueType {
     // Tensor(Tensor), // TODO: Ideally, it should be seperate types for int and float (maybe?)
     String(StringObjIdx),

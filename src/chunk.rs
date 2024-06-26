@@ -1,8 +1,10 @@
+use serde::{Deserialize, Serialize};
+
 /// This module contains the implementation of the Chunk struct and its methods.
 /// The Chunk struct is used to store the bytecode and the constants.
 use crate::value::ValueType;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 #[repr(u8)]
 pub enum OpCode {
     OpConstant,
@@ -38,13 +40,13 @@ pub enum OpCode {
     // OpCall,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub enum VectorType {
     Constant(usize),
     Code(OpCode),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Chunk {
     /// VectorType is either a index to the constants or an OpCode, see `VectorType` enum
     pub code: Vec<VectorType>,

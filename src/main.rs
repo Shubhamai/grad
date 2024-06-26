@@ -9,6 +9,7 @@ mod value;
 mod vm;
 
 use crate::{ast::Parser, scanner::Lexer};
+use ast::ast_to_ascii;
 use clap::Parser as ClapParser;
 use vm::Result;
 
@@ -44,90 +45,43 @@ fn main() {
     }
 }
 
-// fn run_repl() {
-//     loop {
-//         // print prompt
-//         print!("> ");
-//         let _ = std::io::stdout().flush();
-
-//         // read input
-//         let mut input = String::new();
-//         input = match std::io::stdin().read_line(&mut input) {
-//             Ok(_) => input,
-//             Err(e) => panic!("Error reading input: {}", e),
-//         };
-
-//         // exit if input is "exit"
-//         if input.trim() == "exit" || input.trim() == "" {
-//             break;
-//         }
-
-//         // ======================== REPL ========================
-//         let mut lexer = Lexer::new(input.to_string());
-
-//         let out = Parser::new(&mut lexer).parse();
-//         for stmt in out.iter() {
-//             println!("{};", stmt);
-//         }
-
-//         let mut compiler = compiler::Compiler::new();
-//         let (bytecode, interner) = compiler.compile(out);
-
-//         println!("{:?}", bytecode);
-
-//         let debug = debug::Debug::new("test", bytecode.clone());
-//         debug.disassemble();
-
-//         let mut vm = vm::VM::init(bytecode, interner);
-//         let result = vm.run();
-//         // println!("{:?}", result);
-
-//         // ======================== REPL ========================
-//     }
-// }
-
 pub fn run_source(src: &str, debug: bool) -> Result {
     let mut lexer = Lexer::new(src.to_string());
 
-    // print all tokens in single line separated by comma and space
     if debug {
-        println!(
-            "{:?}",
-            lexer
-                .tokens
-                .iter()
-                .map(|t| t.token_type)
-                .rev()
-                .collect::<Vec<_>>()
-        );
+        println!("============= Tokens =============");
+        for token in lexer.tokens.iter().rev() {
+            println!("{:?}", token);
+        }
     };
 
-    let out = Parser::new(&mut lexer).parse();
+    let out = Parser::new(&mut lexer).parse().unwrap();
 
     if debug {
+        println!("============= AST =============");
+        let mut ast_output = String::new();
         for stmt in out.iter() {
-            println!("{:?}", stmt);
+            ast_output.push_str(&ast_to_ascii(stmt, 0));
         }
+        println!("{}", ast_output);
     }
 
     let mut compiler = compiler::Compiler::new();
     let (bytecode, interner) = compiler.compile(out);
 
     if debug {
+        println!("============= Bytecode =============");
         println!("{:?}", bytecode);
     }
 
     let debugger = debug::Debug::new("test", bytecode.clone(), interner.clone());
 
     if debug {
-        debugger.disassemble();
+        println!("{}", debugger.disassemble());
     }
 
     let mut vm = vm::VM::init(bytecode, interner);
-
-    // let time = std::time::Instant::now();
     let result = vm.run();
-    // println!("VM Elapsed: {:?}", time.elapsed());
 
     return result;
 }
