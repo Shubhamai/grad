@@ -4,7 +4,7 @@ This project implements a custom programming language `grad` and its compiler, w
 
 ## Getting Started
 
-Try the language in the [playground](https://grad.vercel.app).
+Try the language in the [playground](https://grad-lang.vercel.app).
 
 ### Example
 
