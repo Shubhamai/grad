@@ -1,0 +1,18 @@
+let a = -4.0;
+let b = 2.0;
+let c = a + b;
+let d = a * b + b**3;
+c += c + 1;
+c += 1 + c + (-a);
+// d += d * 2 + (b + a).relu();
+// d += 3 * d + (b - a).relu();
+// let e = c - d;
+// let f = e**2;
+// let g = f / 2.0;
+// g += 10.0 / f;
+
+
+// print(g) // prints 24.7041, the outcome of this forward pass
+// g.backward() // TODO: implement this
+// print(a.grad) # prints 138.8338, i.e. the numerical value of dg/da
+// print(b.grad) # prints 645.5773, i.e. the numerical value of dg/db
